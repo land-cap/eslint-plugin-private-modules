@@ -1,0 +1,22 @@
+{
+	"name": "@qr-code-app/eslint-plugin-private-modules",
+	"version": "0.0.1",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/QR-CODE-App/futuremedia-fe-sdk.git",
+		"directory": "tooling/eslint-plugin-private-modules"
+	},
+	"publishConfig": {
+		"registry": "https://npm.pkg.github.com",
+		"access": "restricted"
+	},
+	"type": "module",
+	"main": "index.js",
+	"exports": {
+		".": "./index.js"
+	},
+	"scripts": {
+		"test": "node --test tests/*.test.js",
+		"test:ci": "pnpm run test"
+	}
+}
