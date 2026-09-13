@@ -1,10 +1,14 @@
+import { createRequire } from 'node:module'
 import { noPrivateImports } from './rules/no-private-imports.js'
 import { useRelativeInPrivate } from './rules/use-relative-in-private.js'
 import { useAbsoluteOutsideModule } from './rules/use-absolute-outside-module.js'
 
 export { parseTsconfigPaths } from './utils/alias-resolver.js'
 
+const { name, version } = createRequire(import.meta.url)('./package.json')
+
 export const privateModuleBoundary = {
+	meta: { name, version },
 	rules: {
 		'no-private-imports': noPrivateImports,
 		'use-relative-in-private': useRelativeInPrivate,

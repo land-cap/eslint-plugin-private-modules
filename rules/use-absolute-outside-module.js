@@ -41,6 +41,11 @@ const isWithinModule = (absoluteImport, moduleDir) =>
 export const useAbsoluteOutsideModule = {
 	meta: {
 		type: 'problem',
+		docs: {
+			description: 'Require path-alias imports when crossing module boundaries',
+			recommended: false,
+			url: 'https://github.com/land-cap/eslint-plugin-private-modules#use-absolute-outside-module',
+		},
 		fixable: 'code',
 		schema: [ALIAS_SCHEMA],
 		messages: {

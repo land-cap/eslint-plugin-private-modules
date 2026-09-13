@@ -1,4 +1,18 @@
-# module-boundary ESLint Plugin
+# eslint-plugin-private-modules
+
+[![npm](https://img.shields.io/npm/v/eslint-plugin-private-modules)](https://www.npmjs.com/package/eslint-plugin-private-modules)
+[![CI](https://github.com/land-cap/eslint-plugin-private-modules/actions/workflows/ci.yml/badge.svg)](https://github.com/land-cap/eslint-plugin-private-modules/actions/workflows/ci.yml)
+
+ESLint plugin that enforces module boundaries: implementation lives in `_private/`, consumers import only through the
+module's gateway (barrel) file.
+
+## Install
+
+```bash
+npm install --save-dev eslint-plugin-private-modules
+```
+
+Requires ESLint 9+ (flat config) and Node 20.11+.
 
 ## Why This Plugin Exists
 
@@ -168,7 +182,7 @@ import {
 	recommendedConfig, // no-private-imports only
 	strictConfig, // + use-relative-in-private, use-absolute-outside-module
 	parseTsconfigPaths,
-} from '@qr-code-app/eslint-plugin-private-modules'
+} from 'eslint-plugin-private-modules'
 
 const aliases = parseTsconfigPaths('./tsconfig.json')
 
@@ -182,3 +196,38 @@ export default [
 
 Use `recommendedConfig` when you only want the privacy boundary enforced; use `strictConfig` to also enforce the path
 conventions.
+
+## Options
+
+Every rule accepts the same options object:
+
+| Option         | Type                     | Default     | Description                                                                                            |
+| -------------- | ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------ |
+| `aliases`      | `Record<string, string>` | `{}`        | Alias prefix → absolute directory, e.g. `{ '@/': '/abs/src' }`. Needed to resolve alias imports.       |
+| `gatewayNames` | `string[]`               | `['index']` | Basenames (no extension) recognised as a module gateway. Override to allow e.g. `['index', 'public']`. |
+
+`parseTsconfigPaths(tsconfigPath)` derives `aliases` from `compilerOptions.paths` (following `extends`), keeping only
+`prefix/*` → `target/*` entries.
+
+Using the rules directly instead of a preset:
+
+```js
+import { privateModuleBoundary } from 'eslint-plugin-private-modules'
+
+export default [
+	{
+		files: ['./src/**/*.{ts,tsx}'],
+		plugins: { 'private-modules': privateModuleBoundary },
+		rules: {
+			'private-modules/no-private-imports': [
+				'error',
+				{ aliases: { '@/': new URL('./src', import.meta.url).pathname } },
+			],
+		},
+	},
+]
+```
+
+## License
+
+MIT

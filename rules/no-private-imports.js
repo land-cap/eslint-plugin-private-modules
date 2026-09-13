@@ -61,6 +61,12 @@ const buildGatewayFix = (
 export const noPrivateImports = {
 	meta: {
 		type: 'problem',
+		docs: {
+			description:
+				'Disallow importing from `_private/` except through the module gateway',
+			recommended: true,
+			url: 'https://github.com/land-cap/eslint-plugin-private-modules#no-private-imports',
+		},
 		fixable: 'code',
 		schema: [ALIAS_SCHEMA],
 		messages: {

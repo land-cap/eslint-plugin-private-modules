@@ -84,6 +84,12 @@ const resolveAliasGatewayFile = (absoluteImport, moduleDir, gatewayNames) => {
 export const useRelativeInPrivate = {
 	meta: {
 		type: 'problem',
+		docs: {
+			description:
+				'Require relative imports for same-module references inside `_private/`',
+			recommended: false,
+			url: 'https://github.com/land-cap/eslint-plugin-private-modules#use-relative-in-private',
+		},
 		fixable: 'code',
 		schema: [ALIAS_SCHEMA],
 		messages: {

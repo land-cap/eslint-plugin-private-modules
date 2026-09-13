@@ -6,6 +6,6 @@ export const getRuleOptions = (context) => {
 	return {
 		aliases: ruleOptions.aliases ?? {},
 		gatewayNames: ruleOptions.gatewayNames ?? GATEWAY_NAMES,
-		filename: context.filename ?? context.getFilename(),
+		filename: context.filename,
 	}
 }

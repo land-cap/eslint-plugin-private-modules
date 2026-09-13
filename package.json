@@ -1,22 +1,63 @@
 {
-	"name": "@qr-code-app/eslint-plugin-private-modules",
-	"version": "0.0.1",
+	"name": "eslint-plugin-private-modules",
+	"version": "0.1.0",
+	"description": "ESLint plugin that enforces module boundaries via `_private/` folders and gateway (barrel) files",
+	"keywords": [
+		"eslint",
+		"eslintplugin",
+		"eslint-plugin",
+		"module-boundary",
+		"private",
+		"barrel",
+		"encapsulation",
+		"architecture"
+	],
+	"homepage": "https://github.com/land-cap/eslint-plugin-private-modules#readme",
+	"bugs": {
+		"url": "https://github.com/land-cap/eslint-plugin-private-modules/issues"
+	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/QR-CODE-App/futuremedia-fe-sdk.git",
-		"directory": "tooling/eslint-plugin-private-modules"
+		"url": "git+https://github.com/land-cap/eslint-plugin-private-modules.git"
 	},
-	"publishConfig": {
-		"registry": "https://npm.pkg.github.com",
-		"access": "restricted"
-	},
+	"license": "MIT",
+	"author": "Daniel Filat",
 	"type": "module",
 	"main": "index.js",
+	"types": "index.d.ts",
 	"exports": {
-		".": "./index.js"
+		".": {
+			"types": "./index.d.ts",
+			"default": "./index.js"
+		}
 	},
+	"files": [
+		"index.js",
+		"index.d.ts",
+		"rules",
+		"utils"
+	],
 	"scripts": {
 		"test": "node --test tests/*.test.js",
-		"test:ci": "pnpm run test"
+		"lint": "eslint .",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"check": "pnpm run lint && pnpm run format:check && pnpm run test"
+	},
+	"peerDependencies": {
+		"eslint": ">=9.0.0"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.39.4",
+		"eslint": "^9.39.4",
+		"globals": "^17.4.0",
+		"prettier": "^3.6.2"
+	},
+	"engines": {
+		"node": ">=20.11.0"
+	},
+	"packageManager": "pnpm@11.24.0",
+	"publishConfig": {
+		"access": "public"
 	}
 }
