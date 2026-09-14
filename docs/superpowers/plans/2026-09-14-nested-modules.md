@@ -472,7 +472,7 @@ Replaces the rule's "is the importing file a gateway?" test with the real visibi
 
 - [ ] **Step 1: Create the fixture tree**
 
-`panel/index.ts` deliberately re-exports `Header` — a name that originates two levels deep inside a nested module — because that is what makes Task 4's walk-up fixer testable end to end. It deliberately does *not* re-export `Toolbar`, which gives Task 4 its no-fix case.
+`panel/index.ts` deliberately re-exports `Header` — a name that originates two levels deep inside a nested module — because that is what makes Task 4's walk-up fixer testable end to end. It deliberately does *not* re-export `Toolbar`, which is what makes the "reported, but nothing safe to rewrite to" case reachable.
 
 ```bash
 mkdir -p tests/__fixtures__/src/panel/_private/header/_private
