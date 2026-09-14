@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { findBestAliasEntry, resolveAliasToAbsolute } from './alias-resolver.js'
+import { resolveAliasToAbsolute } from './alias-resolver.js'
 import { getPrivateParent, isRelativePath } from './private-paths.js'
 
 // Returns true when a non-relative alias import from inside _private/ resolves
@@ -24,21 +24,14 @@ export const isSameModuleAlias = (filename, src, aliases) => {
 	)
 }
 
-const resolveModuleDirFromRelative = (filename, src) =>
-	getPrivateParent(path.resolve(path.dirname(filename), src))
-
-const resolveModuleDirFromAlias = (src, aliases) => {
-	const entry = findBestAliasEntry(src, aliases)
-	if (!entry) {
-		return null
-	}
-	const [prefix, target] = entry
-	return getPrivateParent(
-		path.join(path.resolve(target), src.slice(prefix.length)),
-	)
-}
-
-export const findModuleDir = (filename, src, aliases) =>
+// Resolves an import specifier to the absolute path it points at, whichever
+// form it was written in. Null when no alias covers a non-relative specifier.
+export const resolveImport = (filename, src, aliases) =>
 	isRelativePath(src)
-		? resolveModuleDirFromRelative(filename, src)
-		: resolveModuleDirFromAlias(src, aliases)
+		? path.resolve(path.dirname(filename), src)
+		: resolveAliasToAbsolute(src, aliases)
+
+export const findModuleDir = (filename, src, aliases) => {
+	const resolved = resolveImport(filename, src, aliases)
+	return resolved === null ? null : getPrivateParent(resolved)
+}

@@ -9,6 +9,7 @@ import {
 	ancestorsOf,
 	rootModuleOf,
 } from '../utils/module-scope.js'
+import { resolveImport } from '../utils/module-resolution.js'
 
 const NAMES = ['index']
 const at = (...parts) => path.join(SRC, ...parts)
@@ -193,5 +194,31 @@ describe('rootModuleOf', () => {
 			),
 			at('panel'),
 		)
+	})
+})
+
+describe('resolveImport', () => {
+	const aliases = { '@/': SRC }
+
+	it('resolves a relative specifier against the importing file', () => {
+		assert.equal(
+			resolveImport(
+				at('avatar', '_private', 'avatar.tsx'),
+				'./utils.ts',
+				aliases,
+			),
+			at('avatar', '_private', 'utils.ts'),
+		)
+	})
+
+	it('resolves an alias specifier against its target directory', () => {
+		assert.equal(
+			resolveImport(at('feed', 'feed.tsx'), '@/avatar/_private/utils', aliases),
+			at('avatar', '_private', 'utils'),
+		)
+	})
+
+	it('returns null for a specifier no alias covers', () => {
+		assert.equal(resolveImport(at('feed', 'feed.tsx'), 'react', aliases), null)
 	})
 })
