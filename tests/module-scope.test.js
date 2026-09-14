@@ -1,7 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import path from 'node:path'
-import { SRC } from './setup.js'
+import { SRC, fixturePath as at } from './setup.js'
 import {
 	ownerOf,
 	isWithin,
@@ -13,7 +12,6 @@ import {
 import { resolveImport } from '../utils/module-resolution.js'
 
 const NAMES = ['index']
-const at = (...parts) => path.join(SRC, ...parts)
 
 describe('ownerOf', () => {
 	it('returns null for a file outside any module', () => {

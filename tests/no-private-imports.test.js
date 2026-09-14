@@ -71,6 +71,13 @@ tester.run('no-private-imports', noPrivateImports, {
 			code: `import { getInitials } from '@/avatar/_private/utils'`,
 			options: opts,
 		},
+		// External packages are outside this plugin's remit, even when they have
+		// a _private/ of their own — no alias covers them, so they never resolve.
+		{
+			filename: fixturePath('feed/feed.tsx'),
+			code: `import x from 'some-pkg/_private/x'`,
+			options: opts,
+		},
 	],
 
 	invalid: [
@@ -220,6 +227,24 @@ tester.run('no-private-imports', noPrivateImports, {
 			filename: fixturePath('feed/feed.tsx'),
 			code: `import { Header } from '@/panel/_private/header/_private/header.tsx'`,
 			options: opts,
+			output: `import { Header } from '@/panel'`,
+			errors: [{ messageId: 'noPrivate' }],
+		},
+
+		// An alias whose target sits inside a private subtree still cannot be
+		// used to reach in: violations are judged on where a specifier resolves,
+		// not on whether its text happens to contain `_private/`.
+		{
+			filename: fixturePath('feed/feed.tsx'),
+			code: `import { Header } from '@header/index.ts'`,
+			options: [
+				{
+					aliases: {
+						'@/': SRC,
+						'@header/': fixturePath('panel/_private/header'),
+					},
+				},
+			],
 			output: `import { Header } from '@/panel'`,
 			errors: [{ messageId: 'noPrivate' }],
 		},

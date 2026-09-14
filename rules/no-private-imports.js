@@ -1,7 +1,7 @@
-import { isPrivatePath, isGatewayFile } from '../utils/private-paths.js'
+import { isGatewayFile } from '../utils/private-paths.js'
 import { ALIAS_SCHEMA } from '../utils/alias-resolver.js'
 import { resolveImport } from '../utils/module-resolution.js'
-import { isVisible, ownerOf } from '../utils/module-scope.js'
+import { isVisible, ancestorsOf } from '../utils/module-scope.js'
 import {
 	findGatewayFile,
 	buildGatewayPath,
@@ -24,13 +24,11 @@ import { getRuleOptions } from '../utils/rule-options.js'
 // module whose gateway the importing file may legally see. A nested module's
 // own gateway is private, so it is never a valid rewrite target from outside.
 const findVisibleGateway = (filename, resolved, gatewayNames) => {
-	let moduleDir = ownerOf(resolved, gatewayNames)
-	while (moduleDir !== null) {
+	for (const moduleDir of ancestorsOf(resolved, gatewayNames)) {
 		const gatewayFile = findGatewayFile(moduleDir, gatewayNames)
 		if (gatewayFile && isVisible(filename, gatewayFile, gatewayNames)) {
 			return gatewayFile
 		}
-		moduleDir = ownerOf(moduleDir, gatewayNames)
 	}
 	return null
 }
@@ -97,14 +95,15 @@ export const noPrivateImports = {
 		const check = (node) => {
 			const sourceNode = node.source
 			const src = sourceNode?.value
-			if (!src || isAssetImport(src) || !isPrivatePath(src)) {
+			if (!src || isAssetImport(src)) {
 				return
 			}
 
-			// An unresolvable specifier stays a violation: we cannot prove it is
-			// in scope, and silently allowing it would open a hole.
+			// A specifier no alias covers is an external package, which this
+			// plugin has no say over. Everything else is judged on where it
+			// actually resolves, not on how the specifier happens to be spelled.
 			const resolved = resolveImport(filename, src, aliases)
-			if (resolved && isVisible(filename, resolved, gatewayNames)) {
+			if (!resolved || isVisible(filename, resolved, gatewayNames)) {
 				return
 			}
 

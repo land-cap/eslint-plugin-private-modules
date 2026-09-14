@@ -41,6 +41,13 @@ tester.run('use-relative-in-private', useRelativeInPrivate, {
 			code: `import { Toolbar } from '../../toolbar'`,
 			options: opts,
 		},
+		// The boundary rules already reject this import; restyling its path would
+		// only produce a differently-spelled violation, so this rule stays out.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Toolbar } from '@/panel/_private/toolbar/_private/toolbar.ts'`,
+			options: opts,
+		},
 	],
 
 	invalid: [

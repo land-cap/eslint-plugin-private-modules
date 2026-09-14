@@ -33,6 +33,9 @@ export const useAbsoluteOutsideModule = {
 	create(context) {
 		const { aliases, gatewayNames, filename } = getRuleOptions(context)
 
+		// Depends on the filename alone, so it is settled once per file.
+		const rootModule = rootModuleOf(filename, gatewayNames)
+
 		const check = (node) => {
 			const sourceNode = node.source
 			const src = sourceNode?.value
@@ -49,7 +52,6 @@ export const useAbsoluteOutsideModule = {
 			}
 
 			const absoluteImport = path.resolve(path.dirname(filename), src)
-			const rootModule = rootModuleOf(filename, gatewayNames)
 
 			// Inside a module — only flag imports that leave its whole subtree.
 			if (rootModule !== null && isWithin(absoluteImport, rootModule)) {

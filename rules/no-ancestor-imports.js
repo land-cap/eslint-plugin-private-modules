@@ -1,6 +1,6 @@
 import { ALIAS_SCHEMA } from '../utils/alias-resolver.js'
 import { resolveImport } from '../utils/module-resolution.js'
-import { isAncestorImport } from '../utils/module-scope.js'
+import { ownerOf, ancestorsOf, targetModuleOf } from '../utils/module-scope.js'
 import {
 	createImportExportVisitors,
 	isAssetImport,
@@ -26,6 +26,17 @@ export const noAncestorImports = {
 	create(context) {
 		const { aliases, gatewayNames, filename } = getRuleOptions(context)
 
+		// Only a nested module has ancestors to violate, and the chain depends
+		// on the filename alone. Walking it once per file lets every file in a
+		// top-level module — which is nearly all of them — skip the visitor
+		// outright, rather than resolving each import only to find no ancestor.
+		const importerModule = ownerOf(filename, gatewayNames)
+		const ancestors =
+			importerModule === null ? [] : ancestorsOf(importerModule, gatewayNames)
+		if (ancestors.length === 0) {
+			return {}
+		}
+
 		const check = (node) => {
 			const src = node.source?.value
 			if (!src || isAssetImport(src)) {
@@ -33,7 +44,11 @@ export const noAncestorImports = {
 			}
 
 			const resolved = resolveImport(filename, src, aliases)
-			if (!resolved || !isAncestorImport(filename, resolved, gatewayNames)) {
+			if (!resolved) {
+				return
+			}
+
+			if (!ancestors.includes(targetModuleOf(resolved, gatewayNames))) {
 				return
 			}
 

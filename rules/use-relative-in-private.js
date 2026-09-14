@@ -13,7 +13,7 @@ import {
 	ownerOf,
 	rootModuleOf,
 	isWithin,
-	isAncestorImport,
+	isLegalImport,
 } from '../utils/module-scope.js'
 import { findGatewayFile } from '../utils/gateway-discovery.js'
 import {
@@ -107,29 +107,37 @@ export const useRelativeInPrivate = {
 	create(context) {
 		const { aliases, gatewayNames, filename } = getRuleOptions(context)
 
+		// The rule applies only to files inside a _private/, and both module
+		// lookups depend on nothing but the filename — so all three are settled
+		// once per file rather than once per import.
+		if (!isInsidePrivate(filename)) {
+			return {}
+		}
+		const moduleDir = ownerOf(filename, gatewayNames)
+		const rootModule = rootModuleOf(filename, gatewayNames)
+
 		const check = (node) => {
 			const sourceNode = node.source
 			const src = sourceNode?.value
-			if (!src || isAssetImport(src) || !isInsidePrivate(filename)) {
+			if (!src || isAssetImport(src)) {
 				return
 			}
 
 			// Alias import that stays inside the file's outermost module → must
 			// use a relative path, unless it points at the file's own gateway
-			// (noGateway below) or at an enclosing module (no-ancestor-imports).
+			// (noGateway below). Imports the boundary rules already reject are
+			// left alone — restyling a violation only respells it.
 			if (!isRelativePath(src)) {
 				const absoluteImport = resolveAliasToAbsolute(src, aliases)
-				const rootModule = rootModuleOf(filename, gatewayNames)
 				if (
 					!absoluteImport ||
 					!rootModule ||
 					!isWithin(absoluteImport, rootModule) ||
-					isAncestorImport(filename, absoluteImport, gatewayNames)
+					!isLegalImport(filename, absoluteImport, gatewayNames)
 				) {
 					return
 				}
 
-				const moduleDir = ownerOf(filename, gatewayNames)
 				const gatewayPath = resolveAliasGatewayFile(
 					absoluteImport,
 					moduleDir,
@@ -154,25 +162,23 @@ export const useRelativeInPrivate = {
 				return
 			}
 
-			// Relative import that resolves to the same module's public gateway →
-			// import directly from the _private/ source file instead.
-			if (isRelativePath(src)) {
-				const resolvedBase = path.resolve(path.dirname(filename), src)
-				const moduleDir = ownerOf(filename, gatewayNames)
-				if (
-					moduleDir &&
-					isGatewayFile(resolvedBase, gatewayNames) &&
-					path.dirname(resolvedBase) === moduleDir
-				) {
-					const gatewayPath = resolveGatewayFile(resolvedBase)
-					context.report({
-						node,
-						messageId: 'noGateway',
-						fix: gatewayPath
-							? buildGatewayFix(node, gatewayPath, path.dirname(filename))
-							: null,
-					})
-				}
+			// Everything below is relative: the alias branch above always returns.
+			// A relative import resolving to the module's own public gateway must
+			// go straight to the _private/ source file instead.
+			const resolvedBase = path.resolve(path.dirname(filename), src)
+			if (
+				moduleDir &&
+				isGatewayFile(resolvedBase, gatewayNames) &&
+				path.dirname(resolvedBase) === moduleDir
+			) {
+				const gatewayPath = resolveGatewayFile(resolvedBase)
+				context.report({
+					node,
+					messageId: 'noGateway',
+					fix: gatewayPath
+						? buildGatewayFix(node, gatewayPath, path.dirname(filename))
+						: null,
+				})
 			}
 		}
 
