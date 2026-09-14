@@ -42,7 +42,8 @@
 		"lint": "eslint .",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"check": "pnpm run lint && pnpm run format:check && pnpm run test"
+		"check": "pnpm run lint && pnpm run format:check && pnpm run test",
+		"prepublishOnly": "pnpm run check"
 	},
 	"peerDependencies": {
 		"eslint": ">=9.0.0"
