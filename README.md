@@ -52,10 +52,37 @@ src/components/base/button/
 
 A file **belongs to a module** if it is either:
 
-- inside the module's `_private/` folder, or
-- a gateway (`index.ts`) file at the module root.
+- a gateway (`index.ts`) file at the module root, or
+- inside the module's `_private/` folder and not inside a nested module within it.
 
 Any other file is **outside any module**.
+
+### Nested Modules
+
+A module may live inside another module's `_private/`. It is then an implementation detail of its parent: nothing
+outside the parent can reach it.
+
+```
+src/panel/
+├── _private/
+│   ├── panel.tsx           ← parent implementation
+│   ├── header/             ← nested module
+│   │   ├── _private/header.tsx
+│   │   └── index.ts
+│   └── toolbar/            ← sibling nested module
+│       ├── _private/toolbar.ts
+│       └── index.ts
+└── index.ts                ← parent gateway
+```
+
+Visibility follows lexical scope: **you may import a module's gateway if every `_private/` on its path also encloses
+you.** So `panel`'s own files see `header` and `toolbar`; `header` and `toolbar` see each other's gateways but not each
+other's internals; nothing outside `panel` sees either.
+
+The relationship is one-way. A nested module must be **agnostic of its parent** — it may not import the parent's
+gateway, nor any plain file in the parent's `_private/`. The parent's gateway re-exports the nested module, so an upward
+import closes a cycle. Keeping the arrow pointing one way also means a nested module can be moved or promoted without
+rewriting its imports.
 
 ## When to Use a Module
 
@@ -83,10 +110,14 @@ Reasons (2) and (3) apply even when nothing is hidden today.
 
 These are the rules every module must follow:
 
-**Internals stay private.** Only gateway files may import from `_private/`. All other files must go through the gateway.
+**Internals stay private.** A `_private/` path may only be imported from inside that same private scope. A module's
+gateway counts as inside its own `_private/`; everyone else must go through the gateway.
 
 **Gateways own only their own private.** A gateway file may only import from its own sibling `_private/` — never from
 another module's.
+
+**Nested modules are agnostic of their parents.** A module nested inside another module's `_private/` may not import
+anything belonging to an enclosing module.
 
 ## Plugin Rules
 
@@ -121,6 +152,34 @@ import { Bar } from '@/other-feature/_private/bar.ts'
 export { Foo } from '@/feature/_private/foo.ts'
 ```
 
+### `no-ancestor-imports` (recommended)
+
+Keeps a nested module independent of the module that encloses it. Without this, a nested module could import its
+parent's gateway — which re-exports the nested module — closing a dependency cycle.
+
+**Violations:**
+
+- `ancestorImport`: a file inside a nested module imports something belonging to an enclosing module. No autofix:
+  inverting a dependency is a design decision.
+
+**Examples:**
+
+```ts
+// panel/_private/header/_private/header.tsx
+
+// ✗ the parent's gateway — this is the cycle
+import { Panel } from '@/panel'
+
+// ✗ a plain implementation file of the parent
+import { clamp } from '../../helper.ts'
+
+// ✓ a sibling nested module's gateway
+import { Toolbar } from '../../toolbar'
+
+// ✓ anything outside the parent module
+import { Button } from '@/button'
+```
+
 ### `use-relative-in-private` (strict only)
 
 Path-style rule for files inside `_private/`.
@@ -150,9 +209,10 @@ import { foo } from './foo.ts'
 
 ### `use-absolute-outside-module` (strict only)
 
-Path-style rule for imports that cross module boundaries (or come from files outside any module): they must use a path
-alias, not a relative path. Relative paths stay legible only within a module; across modules they encode directory
-distance that breaks on every move.
+Path-style rule for imports that leave a module's subtree (or come from files outside any module): they must use a path
+alias, not a relative path. Relative paths stay legible anywhere inside one top-level module — including between sibling
+nested modules, since the whole subtree moves as a unit — but across modules they encode directory distance that breaks
+on every move.
 
 **Violations:**
 
@@ -179,7 +239,7 @@ objects. Spread the result into a flat-config entry alongside your own `files` g
 
 ```js
 import {
-	recommendedConfig, // no-private-imports only
+	recommendedConfig, // no-private-imports, no-ancestor-imports
 	strictConfig, // + use-relative-in-private, use-absolute-outside-module
 	parseTsconfigPaths,
 } from 'eslint-plugin-private-modules'
@@ -194,7 +254,7 @@ export default [
 ]
 ```
 
-Use `recommendedConfig` when you only want the privacy boundary enforced; use `strictConfig` to also enforce the path
+Use `recommendedConfig` when you only want the module boundaries enforced; use `strictConfig` to also enforce the path
 conventions.
 
 ## Options
