@@ -1,6 +1,6 @@
 {
 	"name": "eslint-plugin-private-modules",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "ESLint plugin that enforces module boundaries via `_private/` folders and gateway (barrel) files",
 	"keywords": [
 		"eslint",
