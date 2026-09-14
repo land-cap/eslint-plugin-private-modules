@@ -3,14 +3,18 @@ import {
 	isRelativePath,
 	isInsidePrivate,
 	isGatewayFile,
-	getPrivateParent,
 } from '../utils/private-paths.js'
 import {
 	resolveAliasToRelative,
 	resolveAliasToAbsolute,
 	ALIAS_SCHEMA,
 } from '../utils/alias-resolver.js'
-import { isSameModuleAlias } from '../utils/module-resolution.js'
+import {
+	ownerOf,
+	rootModuleOf,
+	isWithin,
+	isAncestorImport,
+} from '../utils/module-scope.js'
 import { findGatewayFile } from '../utils/gateway-discovery.js'
 import {
 	getImportedNames,
@@ -110,12 +114,22 @@ export const useRelativeInPrivate = {
 				return
 			}
 
-			// Alias import that resolves within the same module → must use relative,
-			// unless it points at the module's own gateway, which gets the same
-			// noGateway treatment as a relative gateway import below.
-			if (!isRelativePath(src) && isSameModuleAlias(filename, src, aliases)) {
-				const moduleDir = getPrivateParent(filename)
+			// Alias import that stays inside the file's outermost module → must
+			// use a relative path, unless it points at the file's own gateway
+			// (noGateway below) or at an enclosing module (no-ancestor-imports).
+			if (!isRelativePath(src)) {
 				const absoluteImport = resolveAliasToAbsolute(src, aliases)
+				const rootModule = rootModuleOf(filename, gatewayNames)
+				if (
+					!absoluteImport ||
+					!rootModule ||
+					!isWithin(absoluteImport, rootModule) ||
+					isAncestorImport(filename, absoluteImport, gatewayNames)
+				) {
+					return
+				}
+
+				const moduleDir = ownerOf(filename, gatewayNames)
 				const gatewayPath = resolveAliasGatewayFile(
 					absoluteImport,
 					moduleDir,
@@ -144,7 +158,7 @@ export const useRelativeInPrivate = {
 			// import directly from the _private/ source file instead.
 			if (isRelativePath(src)) {
 				const resolvedBase = path.resolve(path.dirname(filename), src)
-				const moduleDir = getPrivateParent(filename)
+				const moduleDir = ownerOf(filename, gatewayNames)
 				if (
 					moduleDir &&
 					isGatewayFile(resolvedBase, gatewayNames) &&

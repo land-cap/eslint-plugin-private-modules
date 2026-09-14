@@ -27,6 +27,20 @@ tester.run('use-relative-in-private', useRelativeInPrivate, {
 			code: `import { TAvatarSize } from '../types'`,
 			options: opts,
 		},
+		// The parent's gateway is an ancestor import — no-ancestor-imports owns
+		// it. Rewriting it to a relative path would endorse a cycle.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Panel } from '@/panel'`,
+			options: opts,
+		},
+
+		// Already relative and pointing at a sibling nested module's gateway.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Toolbar } from '../../toolbar'`,
+			options: opts,
+		},
 	],
 
 	invalid: [
@@ -116,6 +130,26 @@ tester.run('use-relative-in-private', useRelativeInPrivate, {
 			options: opts,
 			output: `import { getInitials } from './utils'`,
 			errors: [{ messageId: 'useRelative' }],
+		},
+
+		// Alias aimed at a sibling nested module — both files live in the same
+		// top-level module, so the reference must be relative.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Toolbar } from '@/panel/_private/toolbar'`,
+			options: opts,
+			output: `import { Toolbar } from '../../toolbar'`,
+			errors: [{ messageId: 'useRelative' }],
+		},
+
+		// Alias aimed at the nested module's own gateway — still noGateway,
+		// scoped to the file's own module rather than the outermost one.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Header } from '@/panel/_private/header'`,
+			options: opts,
+			output: `import { Header } from './header.tsx'`,
+			errors: [{ messageId: 'noGateway' }],
 		},
 	],
 })
