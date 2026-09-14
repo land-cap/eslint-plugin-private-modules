@@ -1,11 +1,6 @@
 import path from 'node:path'
-import {
-	isRelativePath,
-	isPrivatePath,
-	isInsidePrivate,
-	isGatewayFile,
-	getPrivateParent,
-} from '../utils/private-paths.js'
+import { isRelativePath, isPrivatePath } from '../utils/private-paths.js'
+import { rootModuleOf, isWithin } from '../utils/module-scope.js'
 import {
 	resolveRelativeToAlias,
 	ALIAS_SCHEMA,
@@ -16,25 +11,6 @@ import {
 } from '../utils/import-export-visitors.js'
 import { createReplaceSourceFix } from '../utils/rule-fixes.js'
 import { getRuleOptions } from '../utils/rule-options.js'
-
-// --- helpers ---
-
-// Returns the module directory for `filename`, or null when the file is not
-// part of any module (neither inside _private/ nor a gateway file).
-const getModuleDir = (filename, gatewayNames) => {
-	if (isInsidePrivate(filename)) {
-		return getPrivateParent(filename)
-	}
-	if (isGatewayFile(filename, gatewayNames)) {
-		return path.dirname(filename)
-	}
-	return null
-}
-
-// True when `absoluteImport` falls inside `moduleDir`.
-const isWithinModule = (absoluteImport, moduleDir) =>
-	absoluteImport === moduleDir ||
-	absoluteImport.startsWith(moduleDir + path.sep)
 
 // --- rule ---
 
@@ -73,10 +49,10 @@ export const useAbsoluteOutsideModule = {
 			}
 
 			const absoluteImport = path.resolve(path.dirname(filename), src)
-			const moduleDir = getModuleDir(filename, gatewayNames)
+			const rootModule = rootModuleOf(filename, gatewayNames)
 
-			// File is inside a module — only flag when the import escapes the module.
-			if (moduleDir !== null && isWithinModule(absoluteImport, moduleDir)) {
+			// Inside a module — only flag imports that leave its whole subtree.
+			if (rootModule !== null && isWithin(absoluteImport, rootModule)) {
 				return
 			}
 

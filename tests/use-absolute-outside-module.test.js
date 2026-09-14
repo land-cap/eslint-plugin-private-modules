@@ -37,6 +37,21 @@ tester.run('use-absolute-outside-module', useAbsoluteOutsideModule, {
 			code: `export { getInitials } from './_private/utils.ts'`,
 			options: [{ aliases: { '@/': SRC }, gatewayNames: ['public'] }],
 		},
+
+		// Sibling nested modules live in one top-level module, which moves as a
+		// unit — relative is the legible form here.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Toolbar } from '../../toolbar'`,
+			options: opts,
+		},
+
+		// A nested module's gateway reaching a sibling, same reasoning.
+		{
+			filename: fixturePath('panel/_private/header/index.ts'),
+			code: `import { Toolbar } from '../toolbar'`,
+			options: opts,
+		},
 	],
 
 	invalid: [
@@ -53,6 +68,16 @@ tester.run('use-absolute-outside-module', useAbsoluteOutsideModule, {
 		{
 			filename: fixturePath('avatar/_private/avatar.tsx'),
 			code: `import { Button } from '../../button/index'`,
+			options: opts,
+			output: `import { Button } from '@/button/index'`,
+			errors: [{ messageId: 'outsideModuleRelative' }],
+		},
+
+		// Escaping the top-level module from deep inside a nested one still
+		// requires an alias.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Button } from '../../../../button/index'`,
 			options: opts,
 			output: `import { Button } from '@/button/index'`,
 			errors: [{ messageId: 'outsideModuleRelative' }],
