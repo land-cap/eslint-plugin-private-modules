@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { isGatewayFile } from './private-paths.js'
+import { findGatewayFile } from './gateway-discovery.js'
 
 const PRIVATE_SEGMENT = `${path.sep}_private${path.sep}`
 
@@ -70,4 +71,30 @@ export const rootModuleOf = (absPath, gatewayNames) => {
 	}
 	const chain = ancestorsOf(owner, gatewayNames)
 	return chain.length === 0 ? owner : chain.at(-1)
+}
+
+// The module a resolved import refers to. A bare directory naming a module
+// refers to that module (via its gateway), not to the private scope the
+// directory happens to sit in — without this, every sibling nested module
+// would look like it belonged to the shared parent.
+const targetModuleOf = (resolved, gatewayNames) =>
+	findGatewayFile(resolved, gatewayNames) === null
+		? ownerOf(resolved, gatewayNames)
+		: resolved
+
+// True when the import reaches a module that encloses the importing file's
+// module. Nested modules must stay agnostic of their parents; the parent's
+// gateway re-exports the nested module, so an upward import closes a cycle.
+export const isAncestorImport = (fromFile, resolved, gatewayNames) => {
+	const importerModule = ownerOf(fromFile, gatewayNames)
+	if (importerModule === null) {
+		return false
+	}
+
+	const targetModule = targetModuleOf(resolved, gatewayNames)
+	if (targetModule === null) {
+		return false
+	}
+
+	return ancestorsOf(importerModule, gatewayNames).includes(targetModule)
 }

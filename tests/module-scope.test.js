@@ -8,6 +8,7 @@ import {
 	isVisible,
 	ancestorsOf,
 	rootModuleOf,
+	isAncestorImport,
 } from '../utils/module-scope.js'
 import { resolveImport } from '../utils/module-resolution.js'
 
@@ -220,5 +221,42 @@ describe('resolveImport', () => {
 
 	it('returns null for a specifier no alias covers', () => {
 		assert.equal(resolveImport(at('feed', 'feed.tsx'), 'react', aliases), null)
+	})
+})
+
+describe('isAncestorImport', () => {
+	const nested = at('panel', '_private', 'header', '_private', 'header.tsx')
+
+	it('flags the gateway of the parent module addressed as a bare directory', () => {
+		assert.equal(isAncestorImport(nested, at('panel'), NAMES), true)
+	})
+
+	it('flags the gateway of the parent module addressed by filename', () => {
+		assert.equal(isAncestorImport(nested, at('panel', 'index.ts'), NAMES), true)
+	})
+
+	it('flags a plain implementation file of the parent', () => {
+		assert.equal(
+			isAncestorImport(nested, at('panel', '_private', 'helper.ts'), NAMES),
+			true,
+		)
+	})
+
+	it('does not flag a sibling nested module', () => {
+		assert.equal(
+			isAncestorImport(nested, at('panel', '_private', 'toolbar'), NAMES),
+			false,
+		)
+	})
+
+	it('does not flag an unrelated top-level module', () => {
+		assert.equal(isAncestorImport(nested, at('button'), NAMES), false)
+	})
+
+	it('does not flag anything for a file outside any module', () => {
+		assert.equal(
+			isAncestorImport(at('feed', 'feed.tsx'), at('panel'), NAMES),
+			false,
+		)
 	})
 })

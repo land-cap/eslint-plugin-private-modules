@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module'
 import { noPrivateImports } from './rules/no-private-imports.js'
+import { noAncestorImports } from './rules/no-ancestor-imports.js'
 import { useRelativeInPrivate } from './rules/use-relative-in-private.js'
 import { useAbsoluteOutsideModule } from './rules/use-absolute-outside-module.js'
 
@@ -11,12 +12,13 @@ export const privateModuleBoundary = {
 	meta: { name, version },
 	rules: {
 		'no-private-imports': noPrivateImports,
+		'no-ancestor-imports': noAncestorImports,
 		'use-relative-in-private': useRelativeInPrivate,
 		'use-absolute-outside-module': useAbsoluteOutsideModule,
 	},
 }
 
-const RECOMMENDED_RULE_NAMES = ['no-private-imports']
+const RECOMMENDED_RULE_NAMES = ['no-private-imports', 'no-ancestor-imports']
 const STRICT_RULE_NAMES = [
 	...RECOMMENDED_RULE_NAMES,
 	'use-relative-in-private',
@@ -37,8 +39,9 @@ const buildConfig = (ruleNames, ruleOptions) => ({
 // so the presets are factories rather than static config objects. Spread the
 // result into a config entry alongside your own `files` glob.
 //
-// `recommended` enforces only the module boundary itself (no-private-imports).
-// `strict` adds the path-style rules (relative inside _private/, alias outside).
+// `recommended` enforces the module boundaries themselves (no-private-imports,
+// no-ancestor-imports). `strict` adds the path-style rules (relative inside
+// _private/, alias outside).
 export const recommendedConfig = (ruleOptions) =>
 	buildConfig(RECOMMENDED_RULE_NAMES, ruleOptions)
 

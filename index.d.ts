@@ -20,6 +20,7 @@ export declare const privateModuleBoundary: ESLint.Plugin & {
 	meta: { name: string; version: string }
 	rules: {
 		'no-private-imports': Rule.RuleModule
+		'no-ancestor-imports': Rule.RuleModule
 		'use-relative-in-private': Rule.RuleModule
 		'use-absolute-outside-module': Rule.RuleModule
 	}
@@ -34,7 +35,7 @@ export declare function parseTsconfigPaths(
 	tsconfigPath: string,
 ): Record<string, string>
 
-/** Flat-config preset enabling only `no-private-imports`. */
+/** Flat-config preset enabling the boundary rules: `no-private-imports` and `no-ancestor-imports`. */
 export declare function recommendedConfig(
 	ruleOptions?: PrivateModulesRuleOptions,
 ): Linter.Config
