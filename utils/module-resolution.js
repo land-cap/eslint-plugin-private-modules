@@ -30,8 +30,3 @@ export const resolveImport = (filename, src, aliases) =>
 	isRelativePath(src)
 		? path.resolve(path.dirname(filename), src)
 		: resolveAliasToAbsolute(src, aliases)
-
-export const findModuleDir = (filename, src, aliases) => {
-	const resolved = resolveImport(filename, src, aliases)
-	return resolved === null ? null : getPrivateParent(resolved)
-}

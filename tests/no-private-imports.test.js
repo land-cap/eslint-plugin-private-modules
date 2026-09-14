@@ -183,12 +183,13 @@ tester.run('no-private-imports', noPrivateImports, {
 		},
 
 		// Sibling nested modules see each other's gateways but not each other's
-		// internals.
+		// internals. The sibling's own gateway IS visible from here, so that is
+		// what the climb stops at — use-relative-in-private then makes it relative.
 		{
 			filename: fixturePath('panel/_private/header/_private/header.tsx'),
 			code: `import { Toolbar } from '@/panel/_private/toolbar/_private/toolbar.ts'`,
 			options: opts,
-			output: null,
+			output: `import { Toolbar } from '@/panel/_private/toolbar'`,
 			errors: [{ messageId: 'noPrivate' }],
 		},
 
@@ -199,6 +200,28 @@ tester.run('no-private-imports', noPrivateImports, {
 			options: opts,
 			output: null,
 			errors: [{ messageId: 'crossModule' }],
+		},
+
+		// The importing file lives in panel's _private/, so it can see the nested
+		// module's own gateway — that, not panel's, is the right target. The old
+		// fixer rewrites this to `@/panel`, which would leave the file importing
+		// its own module through its own gateway.
+		{
+			filename: fixturePath('panel/_private/panel.tsx'),
+			code: `import { Header } from '@/panel/_private/header/_private/header.tsx'`,
+			options: opts,
+			output: `import { Header } from '@/panel/_private/header'`,
+			errors: [{ messageId: 'noPrivate' }],
+		},
+
+		// Deep import from outside: the owning module's gateway is private too,
+		// so the climb continues outward to @/panel, which re-exports Header.
+		{
+			filename: fixturePath('feed/feed.tsx'),
+			code: `import { Header } from '@/panel/_private/header/_private/header.tsx'`,
+			options: opts,
+			output: `import { Header } from '@/panel'`,
+			errors: [{ messageId: 'noPrivate' }],
 		},
 	],
 })

@@ -1,7 +1,7 @@
 import { isPrivatePath, isGatewayFile } from '../utils/private-paths.js'
 import { ALIAS_SCHEMA } from '../utils/alias-resolver.js'
-import { findModuleDir, resolveImport } from '../utils/module-resolution.js'
-import { isVisible } from '../utils/module-scope.js'
+import { resolveImport } from '../utils/module-resolution.js'
+import { isVisible, ownerOf } from '../utils/module-scope.js'
 import {
 	findGatewayFile,
 	buildGatewayPath,
@@ -20,20 +20,34 @@ import { getRuleOptions } from '../utils/rule-options.js'
 
 // --- fix builder ---
 
+// Climbs outward from the module owning the imported path until it reaches a
+// module whose gateway the importing file may legally see. A nested module's
+// own gateway is private, so it is never a valid rewrite target from outside.
+const findVisibleGateway = (filename, resolved, gatewayNames) => {
+	let moduleDir = ownerOf(resolved, gatewayNames)
+	while (moduleDir !== null) {
+		const gatewayFile = findGatewayFile(moduleDir, gatewayNames)
+		if (gatewayFile && isVisible(filename, gatewayFile, gatewayNames)) {
+			return gatewayFile
+		}
+		moduleDir = ownerOf(moduleDir, gatewayNames)
+	}
+	return null
+}
+
 const buildGatewayFix = (
 	node,
 	sourceNode,
 	filename,
-	src,
+	resolved,
 	aliases,
 	gatewayNames,
 ) => {
-	const moduleDir = findModuleDir(filename, src, aliases)
-	if (!moduleDir) {
+	if (!resolved) {
 		return null
 	}
 
-	const gatewayFile = findGatewayFile(moduleDir, gatewayNames)
+	const gatewayFile = findVisibleGateway(filename, resolved, gatewayNames)
 	if (!gatewayFile) {
 		return null
 	}
@@ -107,7 +121,7 @@ export const noPrivateImports = {
 					node,
 					sourceNode,
 					filename,
-					src,
+					resolved,
 					aliases,
 					gatewayNames,
 				),
