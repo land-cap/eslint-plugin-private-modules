@@ -1,41 +1,31 @@
 # Nested Modules Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or
-> superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let a module live inside another module's `_private/`, reachable only from within that private scope, and
-forbidden from importing anything belonging to an enclosing module.
+**Goal:** Let a module live inside another module's `_private/`, reachable only from within that private scope, and forbidden from importing anything belonging to an enclosing module.
 
-**Architecture:** A single new util, `utils/module-scope.js`, owns the whole model — which module a path belongs to
-(`ownerOf`), lexical visibility (`isVisible`), and the enclosing-module chain (`ancestorsOf`). The three existing rules
-are rebuilt on those primitives, replacing three divergent notions of module ownership, and a fourth rule
-`no-ancestor-imports` enforces parent-agnosticism.
+**Architecture:** A single new util, `utils/module-scope.js`, owns the whole model — which module a path belongs to (`ownerOf`), lexical visibility (`isVisible`), and the enclosing-module chain (`ancestorsOf`). The three existing rules are rebuilt on those primitives, replacing three divergent notions of module ownership, and a fourth rule `no-ancestor-imports` enforces parent-agnosticism.
 
-**Tech Stack:** Plain ESM JavaScript (no build step), ESLint 9 flat config, `node --test` with ESLint's `RuleTester`,
-Prettier (tabs, no semicolons, single quotes).
+**Tech Stack:** Plain ESM JavaScript (no build step), ESLint 9 flat config, `node --test` with ESLint's `RuleTester`, Prettier (tabs, no semicolons, single quotes).
 
 **Spec:** `docs/superpowers/specs/2026-09-14-nested-modules-design.md`
 
 ## Global Constraints
 
 - Node >= 20.11.0, ESLint >= 9.0.0. Plain ESM `.js` — no TypeScript, no build step.
-- Prettier config governs formatting: tabs, single quotes, no semicolons, trailing commas. Run `pnpm run format` before
-  committing if unsure.
-- Full verification command is `pnpm run check` (lint + format:check + test). Single test file:
-  `node --test tests/<name>.test.js`.
+- Prettier config governs formatting: tabs, single quotes, no semicolons, trailing commas. Run `pnpm run format` before committing if unsure.
+- Full verification command is `pnpm run check` (lint + format:check + test). Single test file: `node --test tests/<name>.test.js`.
 - `tests/__fixtures__/**` is globally ignored by ESLint, so fixture files are not linted.
-- Fixture files are never executed. They exist only so `existsSync` and `readFileSync` calls in the rules find
-  something. Keep them one line where possible.
-- Every rule accepts the same options object (`aliases`, `gatewayNames`) via `ALIAS_SCHEMA` and reads it through
-  `getRuleOptions(context)`.
-- Commit messages end with: `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
+- Fixture files are never executed. They exist only so `existsSync` and `readFileSync` calls in the rules find something. Keep them one line where possible.
+- Every rule accepts the same options object (`aliases`, `gatewayNames`) via `ALIAS_SCHEMA` and reads it through `getRuleOptions(context)`.
+- Commit messages end with:
+  `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
 
 ## File Structure
 
 **Created:**
 
-- `utils/module-scope.js` — the entire nesting model. Path math only in Tasks 1–4; gains one filesystem-touching helper
-  (`isAncestorImport`) in Task 5.
+- `utils/module-scope.js` — the entire nesting model. Path math only in Tasks 1–4; gains one filesystem-touching helper (`isAncestorImport`) in Task 5.
 - `rules/no-ancestor-imports.js` — the parent-agnosticism rule.
 - `tests/module-scope.test.js` — direct unit tests for the model primitives.
 - `tests/no-ancestor-imports.test.js` — rule tests.
@@ -58,14 +48,11 @@ Prettier (tabs, no semicolons, single quotes).
 Pure path arithmetic. No filesystem access, so the tests need no fixture files on disk — the paths are just strings.
 
 **Files:**
-
 - Create: `utils/module-scope.js`
 - Test: `tests/module-scope.test.js`
 
 **Interfaces:**
-
-- Consumes: `isGatewayFile(filename, gatewayNames)` from `utils/private-paths.js` (already exists — returns true when
-  the basename minus extension is in `gatewayNames`).
+- Consumes: `isGatewayFile(filename, gatewayNames)` from `utils/private-paths.js` (already exists — returns true when the basename minus extension is in `gatewayNames`).
 - Produces:
   - `ownerOf(absPath: string, gatewayNames: string[]) => string | null`
   - `isWithin(absPath: string, dir: string) => boolean`
@@ -82,7 +69,13 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { SRC } from './setup.js'
-import { ownerOf, isWithin, isVisible, ancestorsOf, rootModuleOf } from '../utils/module-scope.js'
+import {
+	ownerOf,
+	isWithin,
+	isVisible,
+	ancestorsOf,
+	rootModuleOf,
+} from '../utils/module-scope.js'
 
 const NAMES = ['index']
 const at = (...parts) => path.join(SRC, ...parts)
@@ -97,7 +90,10 @@ describe('ownerOf', () => {
 	})
 
 	it('assigns a _private/ file to the module owning that _private/', () => {
-		assert.equal(ownerOf(at('avatar', '_private', 'utils.ts'), NAMES), at('avatar'))
+		assert.equal(
+			ownerOf(at('avatar', '_private', 'utils.ts'), NAMES),
+			at('avatar'),
+		)
 	})
 
 	it('assigns a nested _private/ file to the innermost module, not the outermost', () => {
@@ -108,7 +104,10 @@ describe('ownerOf', () => {
 	})
 
 	it('assigns a nested gateway to its own directory, not the enclosing module', () => {
-		assert.equal(ownerOf(at('panel', '_private', 'header', 'index.ts'), NAMES), at('panel', '_private', 'header'))
+		assert.equal(
+			ownerOf(at('panel', '_private', 'header', 'index.ts'), NAMES),
+			at('panel', '_private', 'header'),
+		)
 	})
 
 	it('honours a custom gatewayNames list', () => {
@@ -136,19 +135,43 @@ describe('isVisible', () => {
 	})
 
 	it('blocks an outsider from another module’s _private/', () => {
-		assert.equal(isVisible(outsider, at('avatar', '_private', 'utils.ts'), NAMES), false)
+		assert.equal(
+			isVisible(outsider, at('avatar', '_private', 'utils.ts'), NAMES),
+			false,
+		)
 	})
 
 	it('lets a gateway see its own module’s _private/', () => {
-		assert.equal(isVisible(at('avatar', 'index.ts'), at('avatar', '_private', 'utils.ts'), NAMES), true)
+		assert.equal(
+			isVisible(
+				at('avatar', 'index.ts'),
+				at('avatar', '_private', 'utils.ts'),
+				NAMES,
+			),
+			true,
+		)
 	})
 
 	it('blocks a gateway from another module’s _private/', () => {
-		assert.equal(isVisible(at('avatar', 'index.ts'), at('button', '_private', 'button.tsx'), NAMES), false)
+		assert.equal(
+			isVisible(
+				at('avatar', 'index.ts'),
+				at('button', '_private', 'button.tsx'),
+				NAMES,
+			),
+			false,
+		)
 	})
 
 	it('lets a file inside _private/ see its siblings there', () => {
-		assert.equal(isVisible(at('avatar', '_private', 'avatar.tsx'), at('avatar', '_private', 'utils.ts'), NAMES), true)
+		assert.equal(
+			isVisible(
+				at('avatar', '_private', 'avatar.tsx'),
+				at('avatar', '_private', 'utils.ts'),
+				NAMES,
+			),
+			true,
+		)
 	})
 
 	it('lets a nested module see a sibling nested module’s gateway', () => {
@@ -174,11 +197,21 @@ describe('isVisible', () => {
 	})
 
 	it('blocks an outsider from a nested module entirely', () => {
-		assert.equal(isVisible(outsider, at('panel', '_private', 'header', 'index.ts'), NAMES), false)
+		assert.equal(
+			isVisible(outsider, at('panel', '_private', 'header', 'index.ts'), NAMES),
+			false,
+		)
 	})
 
 	it('lets a parent gateway see a nested module', () => {
-		assert.equal(isVisible(at('panel', 'index.ts'), at('panel', '_private', 'header'), NAMES), true)
+		assert.equal(
+			isVisible(
+				at('panel', 'index.ts'),
+				at('panel', '_private', 'header'),
+				NAMES,
+			),
+			true,
+		)
 	})
 })
 
@@ -188,14 +221,16 @@ describe('ancestorsOf', () => {
 	})
 
 	it('lists enclosing modules outward', () => {
-		assert.deepEqual(ancestorsOf(at('panel', '_private', 'header'), NAMES), [at('panel')])
+		assert.deepEqual(ancestorsOf(at('panel', '_private', 'header'), NAMES), [
+			at('panel'),
+		])
 	})
 
 	it('walks more than one level', () => {
-		assert.deepEqual(ancestorsOf(at('panel', '_private', 'header', '_private', 'badge'), NAMES), [
-			at('panel', '_private', 'header'),
-			at('panel'),
-		])
+		assert.deepEqual(
+			ancestorsOf(at('panel', '_private', 'header', '_private', 'badge'), NAMES),
+			[at('panel', '_private', 'header'), at('panel')],
+		)
 	})
 })
 
@@ -205,18 +240,28 @@ describe('rootModuleOf', () => {
 	})
 
 	it('returns the module itself for a top-level module file', () => {
-		assert.equal(rootModuleOf(at('avatar', '_private', 'utils.ts'), NAMES), at('avatar'))
+		assert.equal(
+			rootModuleOf(at('avatar', '_private', 'utils.ts'), NAMES),
+			at('avatar'),
+		)
 	})
 
 	it('returns the outermost module for a deeply nested file', () => {
-		assert.equal(rootModuleOf(at('panel', '_private', 'header', '_private', 'header.tsx'), NAMES), at('panel'))
+		assert.equal(
+			rootModuleOf(
+				at('panel', '_private', 'header', '_private', 'header.tsx'),
+				NAMES,
+			),
+			at('panel'),
+		)
 	})
 })
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `node --test tests/module-scope.test.js` Expected: FAIL — `Cannot find module '../utils/module-scope.js'`.
+Run: `node --test tests/module-scope.test.js`
+Expected: FAIL — `Cannot find module '../utils/module-scope.js'`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -230,7 +275,8 @@ const PRIVATE_SEGMENT = `${path.sep}_private${path.sep}`
 
 // True when `absPath` is `dir` itself or lives underneath it. The separator
 // check keeps `/src/panel-extra` from counting as inside `/src/panel`.
-export const isWithin = (absPath, dir) => absPath === dir || absPath.startsWith(dir + path.sep)
+export const isWithin = (absPath, dir) =>
+	absPath === dir || absPath.startsWith(dir + path.sep)
 
 // The innermost `<module>/_private` directory enclosing `absPath`, or null.
 // Enclosing _private/ directories nest, so the innermost one implies all the
@@ -267,7 +313,10 @@ export const isVisible = (fromFile, targetPath, gatewayNames) => {
 	}
 
 	const moduleDir = path.dirname(scope)
-	return isGatewayFile(fromFile, gatewayNames) && path.dirname(fromFile) === moduleDir
+	return (
+		isGatewayFile(fromFile, gatewayNames) &&
+		path.dirname(fromFile) === moduleDir
+	)
 }
 
 // The modules enclosing `moduleDir`, nearest first. Each step strips at least
@@ -296,11 +345,13 @@ export const rootModuleOf = (absPath, gatewayNames) => {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `node --test tests/module-scope.test.js` Expected: PASS, all assertions green.
+Run: `node --test tests/module-scope.test.js`
+Expected: PASS, all assertions green.
 
 - [ ] **Step 5: Verify nothing else broke and commit**
 
-Run: `pnpm run check` Expected: lint, format, and the full test suite all pass.
+Run: `pnpm run check`
+Expected: lint, format, and the full test suite all pass.
 
 ```bash
 git add utils/module-scope.js tests/module-scope.test.js
@@ -313,22 +364,17 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ### Task 2: Surface the resolved import path
 
-`module-resolution.js` already resolves a specifier to an absolute path inside both of its branches, then discards it
-and returns only a module directory. The new rules need the absolute path itself.
+`module-resolution.js` already resolves a specifier to an absolute path inside both of its branches, then discards it and returns only a module directory. The new rules need the absolute path itself.
 
 This task is pure extraction: `findModuleDir` must keep behaving exactly as before, so the existing suite is the test.
 
 **Files:**
-
 - Modify: `utils/module-resolution.js`
 - Test: `tests/module-scope.test.js` (append)
 
 **Interfaces:**
-
-- Consumes: `isRelativePath` from `utils/private-paths.js`, `resolveAliasToAbsolute` from `utils/alias-resolver.js`
-  (both exist).
-- Produces: `resolveImport(filename: string, src: string, aliases: Record<string, string>) => string | null` — null only
-  when `src` is a non-relative specifier no alias covers.
+- Consumes: `isRelativePath` from `utils/private-paths.js`, `resolveAliasToAbsolute` from `utils/alias-resolver.js` (both exist).
+- Produces: `resolveImport(filename: string, src: string, aliases: Record<string, string>) => string | null` — null only when `src` is a non-relative specifier no alias covers.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -360,24 +406,24 @@ describe('resolveImport', () => {
 })
 ```
 
-Move the new `import` line up to join the other imports at the top of the file — Prettier will not do it for you, and a
-mid-file import is legal ESM but inconsistent with the rest of the repo.
+Move the new `import` line up to join the other imports at the top of the file — Prettier will not do it for you, and a mid-file import is legal ESM but inconsistent with the rest of the repo.
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `node --test tests/module-scope.test.js` Expected: FAIL — `resolveImport` is not exported
-(`SyntaxError: The requested module ... does not provide an export named 'resolveImport'`).
+Run: `node --test tests/module-scope.test.js`
+Expected: FAIL — `resolveImport` is not exported (`SyntaxError: The requested module ... does not provide an export named 'resolveImport'`).
 
 - [ ] **Step 3: Write the implementation**
 
-In `utils/module-resolution.js`, replace the two private helpers `resolveModuleDirFromRelative` and
-`resolveModuleDirFromAlias` and the `findModuleDir` export with:
+In `utils/module-resolution.js`, replace the two private helpers `resolveModuleDirFromRelative` and `resolveModuleDirFromAlias` and the `findModuleDir` export with:
 
 ```js
 // Resolves an import specifier to the absolute path it points at, whichever
 // form it was written in. Null when no alias covers a non-relative specifier.
 export const resolveImport = (filename, src, aliases) =>
-	isRelativePath(src) ? path.resolve(path.dirname(filename), src) : resolveAliasToAbsolute(src, aliases)
+	isRelativePath(src)
+		? path.resolve(path.dirname(filename), src)
+		: resolveAliasToAbsolute(src, aliases)
 
 export const findModuleDir = (filename, src, aliases) => {
 	const resolved = resolveImport(filename, src, aliases)
@@ -385,15 +431,14 @@ export const findModuleDir = (filename, src, aliases) => {
 }
 ```
 
-Update that file's imports to `import { findBestAliasEntry, resolveAliasToAbsolute } from './alias-resolver.js'` —
-`findBestAliasEntry` is still used by `isSameModuleAlias`, which stays untouched in this task.
+Update that file's imports to `import { findBestAliasEntry, resolveAliasToAbsolute } from './alias-resolver.js'` — `findBestAliasEntry` is still used by `isSameModuleAlias`, which stays untouched in this task.
 
-`findModuleDir` must keep using `getPrivateParent` (which slices at the _first_ `_private/`) for now. Switching it to
-the innermost rule here would change `no-private-imports` behavior before its tests are updated.
+`findModuleDir` must keep using `getPrivateParent` (which slices at the *first* `_private/`) for now. Switching it to the innermost rule here would change `no-private-imports` behavior before its tests are updated.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm run check` Expected: PASS — the new assertions plus every pre-existing test, unchanged.
+Run: `pnpm run check`
+Expected: PASS — the new assertions plus every pre-existing test, unchanged.
 
 - [ ] **Step 5: Commit**
 
@@ -408,11 +453,9 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ### Task 3: Nested fixtures and visibility in `no-private-imports`
 
-Replaces the rule's "is the importing file a gateway?" test with the real visibility predicate. This is where the
-accepted behavior change lands.
+Replaces the rule's "is the importing file a gateway?" test with the real visibility predicate. This is where the accepted behavior change lands.
 
 **Files:**
-
 - Create: `tests/__fixtures__/src/panel/index.ts`
 - Create: `tests/__fixtures__/src/panel/_private/panel.tsx`
 - Create: `tests/__fixtures__/src/panel/_private/helper.ts`
@@ -424,15 +467,12 @@ accepted behavior change lands.
 - Test: `tests/no-private-imports.test.js`, `tests/use-relative-in-private.test.js`
 
 **Interfaces:**
-
 - Consumes: `isVisible`, from Task 1. `resolveImport`, from Task 2.
 - Produces: the `panel/` fixture tree, relied on by Tasks 4–7.
 
 - [ ] **Step 1: Create the fixture tree**
 
-`panel/index.ts` deliberately re-exports `Header` — a name that originates two levels deep inside a nested module —
-because that is what makes Task 4's walk-up fixer testable end to end. It deliberately does _not_ re-export `Toolbar`,
-which gives Task 4 its no-fix case.
+`panel/index.ts` deliberately re-exports `Header` — a name that originates two levels deep inside a nested module — because that is what makes Task 4's walk-up fixer testable end to end. It deliberately does *not* re-export `Toolbar`, which gives Task 4 its no-fix case.
 
 ```bash
 mkdir -p tests/__fixtures__/src/panel/_private/header/_private
@@ -545,12 +585,13 @@ Then add to `invalid`:
 
 ```js
 		// A nested module is invisible from outside its parent's _private/.
-		// No fix yet — Task 4 adds the walk-up that can produce one.
+		// The existing fixer already lands on @/panel here, because panel is the
+		// first module on the path and its gateway re-exports Header.
 		{
 			filename: fixturePath('feed/feed.tsx'),
 			code: `import { Header } from '@/panel/_private/header'`,
 			options: opts,
-			output: null,
+			output: `import { Header } from '@/panel'`,
 			errors: [{ messageId: 'noPrivate' }],
 		},
 
@@ -590,43 +631,50 @@ In `tests/use-relative-in-private.test.js`, add to `invalid` the case that moved
 
 - [ ] **Step 3: Run tests to verify they fail**
 
-Run: `node --test tests/no-private-imports.test.js` Expected: FAIL. The new `valid` sibling/own-module cases report
-`noPrivate`, because the current rule flags every `_private/` specifier written by a non-gateway file.
+Run: `node --test tests/no-private-imports.test.js`
+Expected: FAIL. The new `valid` sibling/own-module cases report `noPrivate`, because the current rule flags every `_private/` specifier written by a non-gateway file.
 
-Run: `node --test tests/use-relative-in-private.test.js` Expected: PASS already. That rule needs no change for this case
-— the assertion is being added to lock the behavior in place now that `no-private-imports` has stopped covering it.
+Run: `node --test tests/use-relative-in-private.test.js`
+Expected: PASS already. That rule needs no change for this case — the assertion is being added to lock the behavior in place now that `no-private-imports` has stopped covering it.
 
 - [ ] **Step 4: Write the implementation**
 
 In `rules/no-private-imports.js`, replace the `check` function inside `create` with:
 
 ```js
-const check = (node) => {
-	const sourceNode = node.source
-	const src = sourceNode?.value
-	if (!src || isAssetImport(src) || !isPrivatePath(src)) {
-		return
-	}
+		const check = (node) => {
+			const sourceNode = node.source
+			const src = sourceNode?.value
+			if (!src || isAssetImport(src) || !isPrivatePath(src)) {
+				return
+			}
 
-	// An unresolvable specifier stays a violation: we cannot prove it is
-	// in scope, and silently allowing it would open a hole.
-	const resolved = resolveImport(filename, src, aliases)
-	if (resolved && isVisible(filename, resolved, gatewayNames)) {
-		return
-	}
+			// An unresolvable specifier stays a violation: we cannot prove it is
+			// in scope, and silently allowing it would open a hole.
+			const resolved = resolveImport(filename, src, aliases)
+			if (resolved && isVisible(filename, resolved, gatewayNames)) {
+				return
+			}
 
-	if (isGatewayFile(filename, gatewayNames)) {
-		context.report({ node, messageId: 'crossModule' })
-		return
-	}
+			if (isGatewayFile(filename, gatewayNames)) {
+				context.report({ node, messageId: 'crossModule' })
+				return
+			}
 
-	context.report({
-		node,
-		messageId: 'noPrivate',
-		data: { gatewayList: formatGatewayList(gatewayNames) },
-		fix: buildGatewayFix(node, sourceNode, filename, src, aliases, gatewayNames),
-	})
-}
+			context.report({
+				node,
+				messageId: 'noPrivate',
+				data: { gatewayList: formatGatewayList(gatewayNames) },
+				fix: buildGatewayFix(
+					node,
+					sourceNode,
+					filename,
+					src,
+					aliases,
+					gatewayNames,
+				),
+			})
+		}
 ```
 
 Update that file's imports: drop `path` and `findModuleDir`, add `resolveImport` and `isVisible`.
@@ -638,12 +686,12 @@ import { resolveImport } from '../utils/module-resolution.js'
 import { isVisible } from '../utils/module-scope.js'
 ```
 
-`buildGatewayFix` keeps its current body and its own `findModuleDir` call for now — Task 4 rewrites it. Keep importing
-`findModuleDir` alongside `resolveImport` until then.
+`buildGatewayFix` keeps its current body and its own `findModuleDir` call for now — Task 4 rewrites it. Keep importing `findModuleDir` alongside `resolveImport` until then.
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `pnpm run check` Expected: PASS. Every pre-existing case still holds except the one deliberately moved.
+Run: `pnpm run check`
+Expected: PASS. Every pre-existing case still holds except the one deliberately moved.
 
 - [ ] **Step 6: Commit**
 
@@ -663,30 +711,38 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ### Task 4: Walk-up autofix
 
-An outsider reaching into a nested module cannot be redirected to that module's gateway — that gateway is private too.
-Climb outward to the first gateway the importer may legally see.
+An outsider reaching into a nested module cannot be redirected to that module's gateway — that gateway is private too. Climb outward to the first gateway the importer may legally see.
 
 **Files:**
-
 - Modify: `rules/no-private-imports.js`
 - Modify: `utils/module-resolution.js` (delete the now-unused `findModuleDir`)
 - Test: `tests/no-private-imports.test.js`
 
 **Interfaces:**
-
-- Consumes: `ownerOf`, `isVisible` (Task 1); `resolveImport` (Task 2); `findGatewayFile`, `buildGatewayPath`,
-  `gatewayExportsAll`, `getImportedNames` (all pre-existing).
+- Consumes: `ownerOf`, `isVisible` (Task 1); `resolveImport` (Task 2); `findGatewayFile`, `buildGatewayPath`, `gatewayExportsAll`, `getImportedNames` (all pre-existing).
 - Produces: no new exports.
 
 - [ ] **Step 1: Write the failing tests**
 
-In `tests/no-private-imports.test.js`, **replace** the `output: null` case added in Task 3 for `feed/feed.tsx` importing
-`@/panel/_private/header` with:
+The existing fixer resolves the owning module with `getPrivateParent`, which slices at the **first** `_private/`. For an outsider that accidentally lands on the right answer — the outermost module is both what `getPrivateParent` returns and the only gateway an outsider can see. The two diverge as soon as the importing file is *inside* the tree, which is the case that drives this task.
+
+Add to `invalid` in `tests/no-private-imports.test.js`:
 
 ```js
-		// Deep import into a nested module. The owning module's gateway is itself
-		// private, so the fixer climbs to the outermost gateway the importer can
-		// see — and only offers it because panel/index.ts re-exports Header.
+		// The importing file lives in panel's _private/, so it can see the nested
+		// module's own gateway — that, not panel's, is the right target. The old
+		// fixer rewrites this to `@/panel`, which would leave the file importing
+		// its own module through its own gateway.
+		{
+			filename: fixturePath('panel/_private/panel.tsx'),
+			code: `import { Header } from '@/panel/_private/header/_private/header.tsx'`,
+			options: opts,
+			output: `import { Header } from '@/panel/_private/header'`,
+			errors: [{ messageId: 'noPrivate' }],
+		},
+
+		// Deep import from outside: the owning module's gateway is private too,
+		// so the climb continues outward to @/panel, which re-exports Header.
 		{
 			filename: fixturePath('feed/feed.tsx'),
 			code: `import { Header } from '@/panel/_private/header/_private/header.tsx'`,
@@ -694,32 +750,12 @@ In `tests/no-private-imports.test.js`, **replace** the `output: null` case added
 			output: `import { Header } from '@/panel'`,
 			errors: [{ messageId: 'noPrivate' }],
 		},
-
-		// Same shape, addressed at the nested gateway rather than deep inside.
-		{
-			filename: fixturePath('feed/feed.tsx'),
-			code: `import { Header } from '@/panel/_private/header'`,
-			options: opts,
-			output: `import { Header } from '@/panel'`,
-			errors: [{ messageId: 'noPrivate' }],
-		},
-
-		// No visible gateway re-exports Toolbar, so there is nothing safe to
-		// rewrite to — report without a fix.
-		{
-			filename: fixturePath('feed/feed.tsx'),
-			code: `import { Toolbar } from '@/panel/_private/toolbar/_private/toolbar.ts'`,
-			options: opts,
-			output: null,
-			errors: [{ messageId: 'noPrivate' }],
-		},
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `node --test tests/no-private-imports.test.js` Expected: FAIL on the first two — the current fixer resolves the
-owning module to `panel/_private/header`, finds its gateway, and produces no output change (`buildGatewayPath` yields a
-still-private path, or the export check fails). The third already passes.
+Run: `node --test tests/no-private-imports.test.js`
+Expected: FAIL on the first case — the current fixer produces `@/panel` where `@/panel/_private/header` is expected. The second case already passes; it is there as regression cover for the climb.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -741,7 +777,14 @@ const findVisibleGateway = (filename, resolved, gatewayNames) => {
 	return null
 }
 
-const buildGatewayFix = (node, sourceNode, filename, resolved, aliases, gatewayNames) => {
+const buildGatewayFix = (
+	node,
+	sourceNode,
+	filename,
+	resolved,
+	aliases,
+	gatewayNames,
+) => {
 	const gatewayFile = findVisibleGateway(filename, resolved, gatewayNames)
 	if (!gatewayFile) {
 		return null
@@ -782,30 +825,28 @@ Update the call site in `check` to pass `resolved` instead of `src`:
 `resolved` can be null there (unresolvable specifier). Guard at the top of `buildGatewayFix`:
 
 ```js
-if (!resolved) {
-	return null
-}
+	if (!resolved) {
+		return null
+	}
 ```
 
 Place it as the function's first statement, before `findVisibleGateway`.
 
-Update imports: `import { isVisible, ownerOf } from '../utils/module-scope.js'`, and drop `findModuleDir` from the
-`module-resolution.js` import entirely.
+Update imports: `import { isVisible, ownerOf } from '../utils/module-scope.js'`, and drop `findModuleDir` from the `module-resolution.js` import entirely.
 
 - [ ] **Step 4: Delete the orphaned helper**
 
 `findModuleDir` now has no callers. Confirm and remove it.
 
-Run: `grep -rn "findModuleDir" --include=*.js .` (excluding `node_modules`) Expected: matches only in
-`utils/module-resolution.js`.
+Run: `grep -rn "findModuleDir" --include=*.js .` (excluding `node_modules`)
+Expected: matches only in `utils/module-resolution.js`.
 
-Delete the `findModuleDir` export from `utils/module-resolution.js` and drop `getPrivateParent` from its import list
-(`isSameModuleAlias` uses it too — keep `getPrivateParent` imported if that function still references it; check before
-editing).
+Delete the `findModuleDir` export from `utils/module-resolution.js` and drop `getPrivateParent` from its import list (`isSameModuleAlias` uses it too — keep `getPrivateParent` imported if that function still references it; check before editing).
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `pnpm run check` Expected: PASS.
+Run: `pnpm run check`
+Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
@@ -820,11 +861,9 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ### Task 5: The `no-ancestor-imports` rule
 
-A nested module must not reach anything belonging to a module that encloses it — not the gateway, not plain files in the
-parent's `_private/`. That coupling is what closes the cycle, since the parent's gateway re-exports the nested module.
+A nested module must not reach anything belonging to a module that encloses it — not the gateway, not plain files in the parent's `_private/`. That coupling is what closes the cycle, since the parent's gateway re-exports the nested module.
 
 **Files:**
-
 - Create: `rules/no-ancestor-imports.js`
 - Create: `tests/no-ancestor-imports.test.js`
 - Modify: `utils/module-scope.js`
@@ -832,12 +871,9 @@ parent's `_private/`. That coupling is what closes the cycle, since the parent's
 - Test: `tests/module-scope.test.js` (append)
 
 **Interfaces:**
-
-- Consumes: `ownerOf`, `ancestorsOf` (Task 1); `resolveImport` (Task 2); `findGatewayFile` (pre-existing);
-  `getRuleOptions`, `createImportExportVisitors`, `isAssetImport`, `ALIAS_SCHEMA` (pre-existing).
+- Consumes: `ownerOf`, `ancestorsOf` (Task 1); `resolveImport` (Task 2); `findGatewayFile` (pre-existing); `getRuleOptions`, `createImportExportVisitors`, `isAssetImport`, `ALIAS_SCHEMA` (pre-existing).
 - Produces:
-  - `isAncestorImport(fromFile: string, resolved: string, gatewayNames: string[]) => boolean` from
-    `utils/module-scope.js` — also consumed by Task 6.
+  - `isAncestorImport(fromFile: string, resolved: string, gatewayNames: string[]) => boolean` from `utils/module-scope.js` — also consumed by Task 6.
   - `noAncestorImports` rule module, registered as `private-modules/no-ancestor-imports`.
 
 - [ ] **Step 1: Write the failing test for `isAncestorImport`**
@@ -857,11 +893,17 @@ describe('isAncestorImport', () => {
 	})
 
 	it('flags a plain implementation file of the parent', () => {
-		assert.equal(isAncestorImport(nested, at('panel', '_private', 'helper.ts'), NAMES), true)
+		assert.equal(
+			isAncestorImport(nested, at('panel', '_private', 'helper.ts'), NAMES),
+			true,
+		)
 	})
 
 	it('does not flag a sibling nested module', () => {
-		assert.equal(isAncestorImport(nested, at('panel', '_private', 'toolbar'), NAMES), false)
+		assert.equal(
+			isAncestorImport(nested, at('panel', '_private', 'toolbar'), NAMES),
+			false,
+		)
 	})
 
 	it('does not flag an unrelated top-level module', () => {
@@ -869,14 +911,18 @@ describe('isAncestorImport', () => {
 	})
 
 	it('does not flag anything for a file outside any module', () => {
-		assert.equal(isAncestorImport(at('feed', 'feed.tsx'), at('panel'), NAMES), false)
+		assert.equal(
+			isAncestorImport(at('feed', 'feed.tsx'), at('panel'), NAMES),
+			false,
+		)
 	})
 })
 ```
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `node --test tests/module-scope.test.js` Expected: FAIL — no export named `isAncestorImport`.
+Run: `node --test tests/module-scope.test.js`
+Expected: FAIL — no export named `isAncestorImport`.
 
 - [ ] **Step 3: Implement `isAncestorImport`**
 
@@ -890,7 +936,9 @@ import { findGatewayFile } from './gateway-discovery.js'
 // directory happens to sit in — without this, every sibling nested module
 // would look like it belonged to the shared parent.
 const targetModuleOf = (resolved, gatewayNames) =>
-	findGatewayFile(resolved, gatewayNames) === null ? ownerOf(resolved, gatewayNames) : resolved
+	findGatewayFile(resolved, gatewayNames) === null
+		? ownerOf(resolved, gatewayNames)
+		: resolved
 
 // True when the import reaches a module that encloses the importing file's
 // module. Nested modules must stay agnostic of their parents; the parent's
@@ -914,7 +962,8 @@ Move the `findGatewayFile` import up with the `isGatewayFile` import at the top 
 
 - [ ] **Step 4: Run it to verify it passes**
 
-Run: `node --test tests/module-scope.test.js` Expected: PASS.
+Run: `node --test tests/module-scope.test.js`
+Expected: PASS.
 
 - [ ] **Step 5: Write the failing rule test**
 
@@ -1019,8 +1068,8 @@ tester.run('no-ancestor-imports', noAncestorImports, {
 
 - [ ] **Step 6: Run it to verify it fails**
 
-Run: `node --test tests/no-ancestor-imports.test.js` Expected: FAIL —
-`Cannot find module '../rules/no-ancestor-imports.js'`.
+Run: `node --test tests/no-ancestor-imports.test.js`
+Expected: FAIL — `Cannot find module '../rules/no-ancestor-imports.js'`.
 
 - [ ] **Step 7: Write the rule**
 
@@ -1030,14 +1079,18 @@ Create `rules/no-ancestor-imports.js`:
 import { ALIAS_SCHEMA } from '../utils/alias-resolver.js'
 import { resolveImport } from '../utils/module-resolution.js'
 import { isAncestorImport } from '../utils/module-scope.js'
-import { createImportExportVisitors, isAssetImport } from '../utils/import-export-visitors.js'
+import {
+	createImportExportVisitors,
+	isAssetImport,
+} from '../utils/import-export-visitors.js'
 import { getRuleOptions } from '../utils/rule-options.js'
 
 export const noAncestorImports = {
 	meta: {
 		type: 'problem',
 		docs: {
-			description: 'Disallow importing from a module that encloses the importing module',
+			description:
+				'Disallow importing from a module that encloses the importing module',
 			recommended: true,
 			url: 'https://github.com/land-cap/eslint-plugin-private-modules#no-ancestor-imports',
 		},
@@ -1074,7 +1127,8 @@ There is no autofix. Inverting a dependency is a design decision, not a mechanic
 
 - [ ] **Step 8: Run it to verify it passes**
 
-Run: `node --test tests/no-ancestor-imports.test.js` Expected: PASS.
+Run: `node --test tests/no-ancestor-imports.test.js`
+Expected: PASS.
 
 - [ ] **Step 9: Register the rule**
 
@@ -1120,7 +1174,8 @@ And update the `recommendedConfig` doc comment:
 
 - [ ] **Step 10: Run the full suite and commit**
 
-Run: `pnpm run check` Expected: PASS.
+Run: `pnpm run check`
+Expected: PASS.
 
 ```bash
 git add rules/no-ancestor-imports.js tests/no-ancestor-imports.test.js utils/module-scope.js tests/module-scope.test.js index.js index.d.ts
@@ -1137,18 +1192,14 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ### Task 6: Root-module scoping in `use-relative-in-private`
 
-Widens the rule's notion of "same module" from the owning module to the outermost enclosing one, so an alias aimed at a
-sibling nested module is rewritten to a relative path. Ancestor targets are excluded — Task 5's rule owns those, and
-rewriting them to relative paths would be actively wrong.
+Widens the rule's notion of "same module" from the owning module to the outermost enclosing one, so an alias aimed at a sibling nested module is rewritten to a relative path. Ancestor targets are excluded — Task 5's rule owns those, and rewriting them to relative paths would be actively wrong.
 
 **Files:**
-
 - Modify: `rules/use-relative-in-private.js`
 - Modify: `utils/module-resolution.js` (delete the orphaned `isSameModuleAlias`)
 - Test: `tests/use-relative-in-private.test.js`
 
 **Interfaces:**
-
 - Consumes: `ownerOf`, `rootModuleOf`, `isWithin` (Task 1); `isAncestorImport` (Task 5).
 - Produces: no new exports.
 
@@ -1199,82 +1250,92 @@ Add to `invalid`:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `node --test tests/use-relative-in-private.test.js` Expected: FAIL. `isSameModuleAlias` compares against
-`getPrivateParent(filename)`, which for a nested file is the _outermost_ module — so the sibling and own-gateway cases
-resolve against the wrong module and are either missed or mis-fixed.
+Run: `node --test tests/use-relative-in-private.test.js`
+Expected: FAIL. `isSameModuleAlias` compares against `getPrivateParent(filename)`, which for a nested file is the *outermost* module — so the sibling and own-gateway cases resolve against the wrong module and are either missed or mis-fixed.
 
 - [ ] **Step 3: Write the implementation**
 
 In `rules/use-relative-in-private.js`, replace the alias branch inside `check`:
 
 ```js
-// Alias import that stays inside the file's outermost module → must
-// use a relative path, unless it points at the file's own gateway
-// (noGateway below) or at an enclosing module (no-ancestor-imports).
-if (!isRelativePath(src)) {
-	const absoluteImport = resolveAliasToAbsolute(src, aliases)
-	const rootModule = rootModuleOf(filename, gatewayNames)
-	if (
-		!absoluteImport ||
-		!rootModule ||
-		!isWithin(absoluteImport, rootModule) ||
-		isAncestorImport(filename, absoluteImport, gatewayNames)
-	) {
-		return
-	}
+			// Alias import that stays inside the file's outermost module → must
+			// use a relative path, unless it points at the file's own gateway
+			// (noGateway below) or at an enclosing module (no-ancestor-imports).
+			if (!isRelativePath(src)) {
+				const absoluteImport = resolveAliasToAbsolute(src, aliases)
+				const rootModule = rootModuleOf(filename, gatewayNames)
+				if (
+					!absoluteImport ||
+					!rootModule ||
+					!isWithin(absoluteImport, rootModule) ||
+					isAncestorImport(filename, absoluteImport, gatewayNames)
+				) {
+					return
+				}
 
-	const moduleDir = ownerOf(filename, gatewayNames)
-	const gatewayPath = resolveAliasGatewayFile(absoluteImport, moduleDir, gatewayNames)
+				const moduleDir = ownerOf(filename, gatewayNames)
+				const gatewayPath = resolveAliasGatewayFile(
+					absoluteImport,
+					moduleDir,
+					gatewayNames,
+				)
 
-	if (gatewayPath) {
-		context.report({
-			node,
-			messageId: 'noGateway',
-			fix: buildGatewayFix(node, gatewayPath, path.dirname(filename)),
-		})
-		return
-	}
+				if (gatewayPath) {
+					context.report({
+						node,
+						messageId: 'noGateway',
+						fix: buildGatewayFix(node, gatewayPath, path.dirname(filename)),
+					})
+					return
+				}
 
-	const relativePath = resolveAliasToRelative(src, aliases, filename)
-	context.report({
-		node,
-		messageId: 'useRelative',
-		fix: buildFix(relativePath, sourceNode),
-	})
-	return
-}
+				const relativePath = resolveAliasToRelative(src, aliases, filename)
+				context.report({
+					node,
+					messageId: 'useRelative',
+					fix: buildFix(relativePath, sourceNode),
+				})
+				return
+			}
 ```
 
 In the relative branch below it, swap `getPrivateParent(filename)` for `ownerOf(filename, gatewayNames)`:
 
 ```js
-const moduleDir = ownerOf(filename, gatewayNames)
+				const moduleDir = ownerOf(filename, gatewayNames)
 ```
 
-Leave the rest of the relative branch alone. It compares `path.dirname(resolvedBase)` against the file's _own_ module,
-so an ancestor gateway reached relatively falls through untouched — which is what we want.
+Leave the rest of the relative branch alone. It compares `path.dirname(resolvedBase)` against the file's *own* module, so an ancestor gateway reached relatively falls through untouched — which is what we want.
 
 Update imports: drop `getPrivateParent` and `isSameModuleAlias`; add the module-scope ones.
 
 ```js
-import { isRelativePath, isInsidePrivate, isGatewayFile } from '../utils/private-paths.js'
-import { ownerOf, rootModuleOf, isWithin, isAncestorImport } from '../utils/module-scope.js'
+import {
+	isRelativePath,
+	isInsidePrivate,
+	isGatewayFile,
+} from '../utils/private-paths.js'
+import {
+	ownerOf,
+	rootModuleOf,
+	isWithin,
+	isAncestorImport,
+} from '../utils/module-scope.js'
 ```
 
-`isGatewayFile` is still used by `resolveAliasGatewayFile`; `isInsidePrivate` still guards the top of `check`. Keep
-both.
+`isGatewayFile` is still used by `resolveAliasGatewayFile`; `isInsidePrivate` still guards the top of `check`. Keep both.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `node --test tests/use-relative-in-private.test.js` Expected: PASS, including every pre-existing case.
+Run: `node --test tests/use-relative-in-private.test.js`
+Expected: PASS, including every pre-existing case.
 
 - [ ] **Step 5: Delete the orphaned helper**
 
-Run: `grep -rn "isSameModuleAlias" --include=*.js .` (excluding `node_modules`) Expected: matches only in
-`utils/module-resolution.js`.
+Run: `grep -rn "isSameModuleAlias" --include=*.js .` (excluding `node_modules`)
+Expected: matches only in `utils/module-resolution.js`.
 
-Delete `isSameModuleAlias` from `utils/module-resolution.js`. The file should now contain only `resolveImport` plus its
-imports — trim those down to what remains:
+Delete `isSameModuleAlias` from `utils/module-resolution.js`. The file should now contain only `resolveImport` plus its imports — trim those down to what remains:
 
 ```js
 import path from 'node:path'
@@ -1284,7 +1345,8 @@ import { isRelativePath } from './private-paths.js'
 
 - [ ] **Step 6: Run the full suite and commit**
 
-Run: `pnpm run check` Expected: PASS.
+Run: `pnpm run check`
+Expected: PASS.
 
 ```bash
 git add rules/use-relative-in-private.js utils/module-resolution.js tests/use-relative-in-private.test.js
@@ -1300,18 +1362,14 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ### Task 7: Root-module scoping in `use-absolute-outside-module`
 
-This rule carries its own `getModuleDir`, which checks "inside `_private/`" before "is a gateway" and therefore assigns
-a nested gateway to the wrong module. Replacing it with `rootModuleOf` fixes that and delivers the intended relaxation:
-relative paths travel freely within one top-level module's subtree.
+This rule carries its own `getModuleDir`, which checks "inside `_private/`" before "is a gateway" and therefore assigns a nested gateway to the wrong module. Replacing it with `rootModuleOf` fixes that and delivers the intended relaxation: relative paths travel freely within one top-level module's subtree.
 
 **Files:**
-
 - Modify: `rules/use-absolute-outside-module.js`
 - Modify: `utils/private-paths.js` (delete the orphaned `getPrivateParent`)
 - Test: `tests/use-absolute-outside-module.test.js`
 
 **Interfaces:**
-
 - Consumes: `rootModuleOf`, `isWithin` (Task 1).
 - Produces: no new exports.
 
@@ -1352,30 +1410,28 @@ Add to `invalid`:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `node --test tests/use-absolute-outside-module.test.js` Expected: FAIL on both `valid` additions. `getModuleDir`
-puts the header files in `panel` via the private-first branch for the first case, and mis-assigns the nested gateway for
-the second; either way `../toolbar`-style paths land outside the computed module and get flagged.
+Run: `node --test tests/use-absolute-outside-module.test.js`
+Expected: FAIL on both `valid` additions. `getModuleDir` puts the header files in `panel` via the private-first branch for the first case, and mis-assigns the nested gateway for the second; either way `../toolbar`-style paths land outside the computed module and get flagged.
 
 - [ ] **Step 3: Write the implementation**
 
-In `rules/use-absolute-outside-module.js`, delete both local helpers (`getModuleDir` and `isWithinModule`) and rewrite
-the tail of `check`:
+In `rules/use-absolute-outside-module.js`, delete both local helpers (`getModuleDir` and `isWithinModule`) and rewrite the tail of `check`:
 
 ```js
-const absoluteImport = path.resolve(path.dirname(filename), src)
-const rootModule = rootModuleOf(filename, gatewayNames)
+			const absoluteImport = path.resolve(path.dirname(filename), src)
+			const rootModule = rootModuleOf(filename, gatewayNames)
 
-// Inside a module — only flag imports that leave its whole subtree.
-if (rootModule !== null && isWithin(absoluteImport, rootModule)) {
-	return
-}
+			// Inside a module — only flag imports that leave its whole subtree.
+			if (rootModule !== null && isWithin(absoluteImport, rootModule)) {
+				return
+			}
 
-const aliasPath = resolveRelativeToAlias(src, filename, aliases)
-context.report({
-	node,
-	messageId: 'outsideModuleRelative',
-	fix: createReplaceSourceFix(sourceNode, aliasPath),
-})
+			const aliasPath = resolveRelativeToAlias(src, filename, aliases)
+			context.report({
+				node,
+				messageId: 'outsideModuleRelative',
+				fix: createReplaceSourceFix(sourceNode, aliasPath),
+			})
 ```
 
 Update imports — only `isRelativePath` and `isPrivatePath` are still needed from `private-paths.js`:
@@ -1388,19 +1444,20 @@ import { rootModuleOf, isWithin } from '../utils/module-scope.js'
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `node --test tests/use-absolute-outside-module.test.js` Expected: PASS, including every pre-existing case.
+Run: `node --test tests/use-absolute-outside-module.test.js`
+Expected: PASS, including every pre-existing case.
 
 - [ ] **Step 5: Delete the orphaned helper**
 
-Run: `grep -rn "getPrivateParent" --include=*.js .` (excluding `node_modules`) Expected: matches only in
-`utils/private-paths.js`.
+Run: `grep -rn "getPrivateParent" --include=*.js .` (excluding `node_modules`)
+Expected: matches only in `utils/private-paths.js`.
 
-Delete `getPrivateParent` and the now-unused `PRIVATE_SEGMENT` constant from `utils/private-paths.js`. Leave
-`isPrivatePath`, `isRelativePath`, `isInsidePrivate`, and `isGatewayFile` in place — all still have callers.
+Delete `getPrivateParent` and the now-unused `PRIVATE_SEGMENT` constant from `utils/private-paths.js`. Leave `isPrivatePath`, `isRelativePath`, `isInsidePrivate`, and `isGatewayFile` in place — all still have callers.
 
 - [ ] **Step 6: Run the full suite and commit**
 
-Run: `pnpm run check` Expected: PASS.
+Run: `pnpm run check`
+Expected: PASS.
 
 ```bash
 git add rules/use-absolute-outside-module.js utils/private-paths.js tests/use-absolute-outside-module.test.js
@@ -1417,22 +1474,18 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ### Task 8: Documentation
 
-The README is the plugin's only user-facing documentation, and nesting changes the definition of a module, the contract,
-the rule list, and one preset.
+The README is the plugin's only user-facing documentation, and nesting changes the definition of a module, the contract, the rule list, and one preset.
 
 **Files:**
-
 - Modify: `README.md`
 
 **Interfaces:**
-
 - Consumes: the finished behavior of all four rules.
 - Produces: nothing code-facing.
 
 - [ ] **Step 1: Extend "What Is a Module"**
 
-After the existing example layout and the "A file **belongs to a module** if..." list, replace that list with one that
-accounts for nesting and add the nesting section:
+After the existing example layout and the "A file **belongs to a module** if..." list, replace that list with one that accounts for nesting and add the nesting section:
 
 ```markdown
 A file **belongs to a module** if it is either:
@@ -1444,14 +1497,20 @@ Any other file is **outside any module**.
 
 ### Nested Modules
 
-A module may live inside another module's `_private/`. It is then an implementation detail of its parent: nothing
-outside the parent can reach it.
+A module may live inside another module's `_private/`. It is then an implementation detail of its
+parent: nothing outside the parent can reach it.
+
 ```
-
-src/panel/ ├── _private/ │ ├── panel.tsx ← parent implementation │ ├── header/ ← nested module │ │ ├──
-_private/header.tsx │ │ └── index.ts │ └── toolbar/ ← sibling nested module │ ├── _private/toolbar.ts │ └── index.ts └──
-index.ts ← parent gateway
-
+src/panel/
+├── _private/
+│   ├── panel.tsx           ← parent implementation
+│   ├── header/             ← nested module
+│   │   ├── _private/header.tsx
+│   │   └── index.ts
+│   └── toolbar/            ← sibling nested module
+│       ├── _private/toolbar.ts
+│       └── index.ts
+└── index.ts                ← parent gateway
 ```
 
 Visibility follows lexical scope: **you may import a module's gateway if every `_private/` on its
@@ -1471,14 +1530,15 @@ Replace the whole `## Module Contract` section body with:
 ```markdown
 These are the rules every module must follow:
 
-**Internals stay private.** A `_private/` path may only be imported from inside that same private scope. A module's
-gateway counts as inside its own `_private/`; everyone else must go through the gateway.
+**Internals stay private.** A `_private/` path may only be imported from inside that same private
+scope. A module's gateway counts as inside its own `_private/`; everyone else must go through the
+gateway.
 
-**Gateways own only their own private.** A gateway file may only import from its own sibling `_private/` — never from
-another module's.
+**Gateways own only their own private.** A gateway file may only import from its own sibling
+`_private/` — never from another module's.
 
-**Nested modules are agnostic of their parents.** A module nested inside another module's `_private/` may not import
-anything belonging to an enclosing module.
+**Nested modules are agnostic of their parents.** A module nested inside another module's
+`_private/` may not import anything belonging to an enclosing module.
 ```
 
 - [ ] **Step 3: Document the new rule**
@@ -1488,13 +1548,14 @@ Add after the `no-private-imports` section, before `use-relative-in-private`:
 ````markdown
 ### `no-ancestor-imports` (recommended)
 
-Keeps a nested module independent of the module that encloses it. Without this, a nested module could import its
-parent's gateway — which re-exports the nested module — closing a dependency cycle.
+Keeps a nested module independent of the module that encloses it. Without this, a nested module
+could import its parent's gateway — which re-exports the nested module — closing a dependency
+cycle.
 
 **Violations:**
 
-- `ancestorImport`: a file inside a nested module imports something belonging to an enclosing module. No autofix:
-  inverting a dependency is a design decision.
+- `ancestorImport`: a file inside a nested module imports something belonging to an enclosing
+  module. No autofix: inverting a dependency is a design decision.
 
 **Examples:**
 
@@ -1517,9 +1578,9 @@ import { Button } from '@/button'
 
 - [ ] **Step 4: Update the path-rule descriptions and Configs**
 
-In `use-absolute-outside-module`, change "imports that cross module boundaries" to describe the subtree scope — relative
-paths are legal anywhere inside one top-level module, including between sibling nested modules, and an alias is required
-the moment an import leaves it.
+In `use-absolute-outside-module`, change "imports that cross module boundaries" to describe the
+subtree scope — relative paths are legal anywhere inside one top-level module, including between
+sibling nested modules, and an alias is required the moment an import leaves it.
 
 In `## Configs`, update the preset comments:
 
@@ -1531,13 +1592,13 @@ import {
 } from 'eslint-plugin-private-modules'
 ```
 
-And the sentence beneath it: `recommended` enforces the module boundaries themselves; `strict` adds the path
-conventions.
+And the sentence beneath it: `recommended` enforces the module boundaries themselves; `strict`
+adds the path conventions.
 
 - [ ] **Step 5: Verify and commit**
 
-Run: `pnpm run check` Expected: PASS — `format:check` covers Markdown, so fix any Prettier complaints with
-`pnpm run format`.
+Run: `pnpm run check`
+Expected: PASS — `format:check` covers Markdown, so fix any Prettier complaints with `pnpm run format`.
 
 ```bash
 git add README.md
