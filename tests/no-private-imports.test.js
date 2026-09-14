@@ -31,6 +31,46 @@ tester.run('no-private-imports', noPrivateImports, {
 			code: `export { getInitials } from '@/avatar/_private/utils'`,
 			options: opts,
 		},
+		// Nested module: the parent gateway may reach into its own _private/ to
+		// pick up the nested module's gateway.
+		{
+			filename: fixturePath('panel/index.ts'),
+			code: `export { Header } from './_private/header'`,
+			options: opts,
+		},
+
+		// Nested module: its gateway owns its own _private/, exactly like a
+		// top-level module's gateway does.
+		{
+			filename: fixturePath('panel/_private/header/index.ts'),
+			code: `export { Header } from './_private/header.tsx'`,
+			options: opts,
+		},
+
+		// Sibling nested modules share a private scope, so one may reach the
+		// other's gateway — the path crosses a _private/ that encloses both.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Toolbar } from '@/panel/_private/toolbar'`,
+			options: opts,
+		},
+
+		// A file in the parent's _private/ is inside the scope containing the
+		// nested modules, so it may use their gateways.
+		{
+			filename: fixturePath('panel/_private/panel.tsx'),
+			code: `import { Header } from './header'`,
+			options: opts,
+		},
+
+		// Accepted behavior change: an alias pointing at your own module's
+		// _private/ is a path-style problem, not a boundary one. Reported by
+		// use-relative-in-private instead.
+		{
+			filename: fixturePath('avatar/_private/avatar.tsx'),
+			code: `import { getInitials } from '@/avatar/_private/utils'`,
+			options: opts,
+		},
 	],
 
 	invalid: [
@@ -48,16 +88,6 @@ tester.run('no-private-imports', noPrivateImports, {
 		// Autofixes to the alias form of the gateway.
 		{
 			filename: fixturePath('feed/feed.tsx'),
-			code: `import { getInitials } from '@/avatar/_private/utils'`,
-			options: opts,
-			output: `import { getInitials } from '@/avatar'`,
-			errors: [{ messageId: 'noPrivate' }],
-		},
-
-		// Non-gateway file inside a module's own _private/ reaching into a sibling _private/
-		// file via alias — still not a gateway, so it must go through the gateway too.
-		{
-			filename: fixturePath('avatar/_private/avatar.tsx'),
 			code: `import { getInitials } from '@/avatar/_private/utils'`,
 			options: opts,
 			output: `import { getInitials } from '@/avatar'`,
@@ -139,6 +169,36 @@ tester.run('no-private-imports', noPrivateImports, {
 					data: { gatewayList: 'public.ts' },
 				},
 			],
+		},
+
+		// A nested module is invisible from outside its parent's _private/.
+		// The existing fixer already lands on @/panel here, because panel is the
+		// first module on the path and its gateway re-exports Header.
+		{
+			filename: fixturePath('feed/feed.tsx'),
+			code: `import { Header } from '@/panel/_private/header'`,
+			options: opts,
+			output: `import { Header } from '@/panel'`,
+			errors: [{ messageId: 'noPrivate' }],
+		},
+
+		// Sibling nested modules see each other's gateways but not each other's
+		// internals.
+		{
+			filename: fixturePath('panel/_private/header/_private/header.tsx'),
+			code: `import { Toolbar } from '@/panel/_private/toolbar/_private/toolbar.ts'`,
+			options: opts,
+			output: null,
+			errors: [{ messageId: 'noPrivate' }],
+		},
+
+		// A nested module's gateway may not reach into a sibling's _private/.
+		{
+			filename: fixturePath('panel/_private/header/index.ts'),
+			code: `export { Toolbar } from '@/panel/_private/toolbar/_private/toolbar.ts'`,
+			options: opts,
+			output: null,
+			errors: [{ messageId: 'crossModule' }],
 		},
 	],
 })

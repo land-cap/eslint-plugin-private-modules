@@ -107,5 +107,15 @@ tester.run('use-relative-in-private', useRelativeInPrivate, {
 			output: `import { getInitials } from './utils.ts'`,
 			errors: [{ messageId: 'noGateway' }],
 		},
+
+		// Alias to your own module's _private/ from another file in that _private/.
+		// Moved here from no-private-imports: this is a path-style violation.
+		{
+			filename: fixturePath('avatar/_private/avatar.tsx'),
+			code: `import { getInitials } from '@/avatar/_private/utils'`,
+			options: opts,
+			output: `import { getInitials } from './utils'`,
+			errors: [{ messageId: 'useRelative' }],
+		},
 	],
 })

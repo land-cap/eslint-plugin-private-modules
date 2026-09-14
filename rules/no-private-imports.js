@@ -1,7 +1,7 @@
-import path from 'node:path'
 import { isPrivatePath, isGatewayFile } from '../utils/private-paths.js'
 import { ALIAS_SCHEMA } from '../utils/alias-resolver.js'
-import { findModuleDir } from '../utils/module-resolution.js'
+import { findModuleDir, resolveImport } from '../utils/module-resolution.js'
+import { isVisible } from '../utils/module-scope.js'
 import {
 	findGatewayFile,
 	buildGatewayPath,
@@ -87,27 +87,31 @@ export const noPrivateImports = {
 				return
 			}
 
-			if (!isGatewayFile(filename, gatewayNames)) {
-				context.report({
-					node,
-					messageId: 'noPrivate',
-					data: { gatewayList: formatGatewayList(gatewayNames) },
-					fix: buildGatewayFix(
-						node,
-						sourceNode,
-						filename,
-						src,
-						aliases,
-						gatewayNames,
-					),
-				})
+			// An unresolvable specifier stays a violation: we cannot prove it is
+			// in scope, and silently allowing it would open a hole.
+			const resolved = resolveImport(filename, src, aliases)
+			if (resolved && isVisible(filename, resolved, gatewayNames)) {
 				return
 			}
 
-			const importModuleDir = findModuleDir(filename, src, aliases)
-			if (importModuleDir !== path.dirname(filename)) {
+			if (isGatewayFile(filename, gatewayNames)) {
 				context.report({ node, messageId: 'crossModule' })
+				return
 			}
+
+			context.report({
+				node,
+				messageId: 'noPrivate',
+				data: { gatewayList: formatGatewayList(gatewayNames) },
+				fix: buildGatewayFix(
+					node,
+					sourceNode,
+					filename,
+					src,
+					aliases,
+					gatewayNames,
+				),
+			})
 		}
 
 		return createImportExportVisitors(check)
